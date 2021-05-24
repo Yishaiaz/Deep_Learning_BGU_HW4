@@ -1,2 +1,17 @@
-GAN architecture:
-Vanilla? Generative Multi-Adversarial Networks? BEGAN?
+GAN architecture options:
+Vanilla? One generator one discriminator.
+Generative Multi-Adversarial Networks? multiple discriminator receiving varying real images to compare with the fake.
+BEGAN? encoder decoder architecture
+BiGAN? - to create good embeddings representation.
+
+TODOS:
+create a transformer from generated to real? can we achieve that?
+
+resources:
+https://www.tensorflow.org/tutorials/generative/dcgan
+https://towardsdatascience.com/review-of-gans-for-tabular-data-a30a2199342
+https://towardsdatascience.com/generating-synthetic-tabular-data-503fe823f377
+
+Papers:
+https://arxiv.org/abs/1907.00503 (2019)
+https://www.sciencedirect.com/science/article/pii/S0957417421000233 (2021)
