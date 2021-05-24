@@ -5,6 +5,7 @@ from typing import List, Tuple
 from scipy.io import arff
 from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from sklearn.model_selection import train_test_split
+import tensorflow as tf
 from collections import defaultdict
 
 
@@ -15,7 +16,7 @@ def read_arff_as_dataframe(path_to_arff: str) -> Tuple[pd.DataFrame, dict]:
     return df, df_attributes
 
 
-def read_and_prepare_dataset(path_to_arff: str, test_size: float = 0.33) -> Tuple[np.array, np.array, np.array, np.array]:
+def read_and_prepare_dataset(path_to_arff: str, test_size: float = 0.33, for_rfc: bool = False, shuffle: bool = False):
     data_df, data_attributes = read_arff_as_dataframe(path_to_arff=path_to_arff)
     label_encoders_dict = defaultdict(LabelEncoder)
     # encode categorical columns
@@ -23,9 +24,16 @@ def read_and_prepare_dataset(path_to_arff: str, test_size: float = 0.33) -> Tupl
     fitted_df = data_df.apply(lambda x: label_encoders_dict[x.name].fit_transform(x) if x.name in cols_to_encode else x)
     # minmax scaling for all columns
     scaled_df = fitted_df.apply(lambda x: (x - x.values.min()) / (x.values.max() - x.values.min()))
+    # create tf.data.Dataset
+    if not for_rfc:
+        ds = tf.data.Dataset.from_tensor_slices(scaled_df)
+        if shuffle:
+            ds = ds.shuffle(buffer_size=100)
+        return ds
     # split to x and y
-    only_vals = scaled_df.values
-    x, y = only_vals[:, :-1], only_vals[:, -1]
-    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=SEED)
-    return x_train, x_test, y_train, y_test
+    else:
+        only_vals = scaled_df.values
+        x, y = only_vals[:, :-1], only_vals[:, -1]
+        x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=test_size, random_state=SEED, shuffle=shuffle)
+        return x_train, x_test, y_train, y_test
 
