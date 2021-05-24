@@ -1,0 +1,2 @@
+GAN architecture:
+Vanilla? Generative Multi-Adversarial Networks? BEGAN?
