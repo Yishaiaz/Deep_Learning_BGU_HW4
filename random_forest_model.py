@@ -5,13 +5,13 @@ from preprocessing_utils import *
 
 
 def create_and_train_random_forest(file_path_to_train: str) -> RandomForestClassifier:
-    x_train, x_test, y_train, y_test = read_and_prepare_dataset(file_path_to_train, test_size=0.33)
+    x_train, x_test, y_train, y_test = read_and_prepare_dataset(file_path_to_train, test_size=0.33, for_rfc=True)
     rfc = RandomForestClassifier()
     rfc.fit(x_train, y_train)
-    print(f"rfc score on {file_path_to_train.split(os.sep)[-1]} dataset: {rfc.score(x_test, y_test)}")
+    print(f"rfc score on {file_path_to_train.split(os.sep)[-1]} dataset: {rfc.score(x_test, y_test)}") # todo: remove before submission
     path_for_rfc = RANDOM_FOREST_PATH_FOR_DIABETES if \
         file_path_to_train.split(os.sep)[-1] == RANDOM_FOREST_PATH_FOR_DIABETES else RANDOM_FOREST_PATH_FOR_G_CREDITS
-    if OVERWRITE_RFC_FILE or os.path.isfile(path_for_rfc):
+    if OVERWRITE_RFC_FILE or not os.path.isfile(path_for_rfc):
         with open(path_for_rfc, 'wb') as rfc_pickle_file:
             pickle.dump(rfc, rfc_pickle_file)
 
