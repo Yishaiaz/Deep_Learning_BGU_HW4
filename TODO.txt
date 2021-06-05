@@ -1,11 +1,16 @@
 GAN architecture options:
 Vanilla? One generator one discriminator.
+conditional W-GAN.
 Generative Multi-Adversarial Networks? multiple discriminator receiving varying real images to compare with the fake.
 BEGAN? encoder decoder architecture
 BiGAN? - to create good embeddings representation.
 
 TODOS:
-create a transformer from generated to real? can we achieve that?
+1. create architectures for generator based on dataset type.
+2. implement Dense layer for each feature at generator. For each dataset create the appropriate implmetation.
+3. Gumbel softmax implementation as final layer for generator (categorical features only).
+4. min-max scaler for [-1, 1] - TO DISCUSS AND DECIDE FIRST
+
 
 resources:
 https://www.tensorflow.org/tutorials/generative/dcgan
@@ -15,3 +20,24 @@ https://towardsdatascience.com/generating-synthetic-tabular-data-503fe823f377
 Papers:
 https://arxiv.org/abs/1907.00503 (2019)
 https://www.sciencedirect.com/science/article/pii/S0957417421000233 (2021)
+https://arxiv.org/abs/2102.08369
+
+
+Evaluation:
+1. simple model fitting on real data and test on generated. - Yishaia
+2. Table evaluator. - Yishaia
+3. statistic significance and visualization of distribution.
+4. euclidean distance from either - closest sample, or an average of all from same class (TBD).
+5. PCA/tSNE - observe/compare the clustering of lower dimensionality of both generated and real data.
+6. KL-divergence.
+
+0 0
+0 1
+1 0
+1 1
+
+0001
+0010
+0100
+1000
+
