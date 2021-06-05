@@ -7,7 +7,7 @@ from pandas.api.types import is_numeric_dtype
 from pandas.api.types import is_string_dtype
 from scipy.io import arff
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler
 from tensorflow.python.data import Dataset
 
 from global_vars import *
@@ -79,10 +79,18 @@ def convert_x_y_to_tf_dataset(X: pd.DataFrame, y: pd.DataFrame, batch_size: int,
     return ds
 
 
+def split_into_train_test(X: pd.DataFrame,
+                          test_size: float = 0.3) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    # split into train/test
+    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=SEED,
+                                                        shuffle=True, stratify=y)
+
+    return x_train, x_test, y_train, y_test
+
+
 def read_and_prepare_dataset(path_to_arff_file: str,
                              labels_to_num_dict: dict,
-                             test_size: float = 0.3,
-                             decode_categorical_columns: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+                             decode_categorical_columns: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     # load given file into DataFrame
     df = read_arff_file_as_dataframe(path_to_arff_file)
@@ -104,8 +112,8 @@ def read_and_prepare_dataset(path_to_arff_file: str,
     # transform label categorical binary column
     y = transform_categorical_binary_column(y, target_column_name, labels_to_num_dict)
 
-    # apply standardization on all numeric columns
-    X[numeric_columns] = pd.DataFrame(StandardScaler().fit_transform(X[numeric_columns].values), columns=numeric_columns, index=X.index)
+    # apply min-max scaler on all numeric columns
+    X[numeric_columns] = pd.DataFrame(MinMaxScaler().fit_transform(X[numeric_columns].values), columns=numeric_columns, index=X.index)
 
     # align categorical column type
     col_type_mapping = {col: 'object' for col in categorical_columns}
@@ -125,8 +133,4 @@ def read_and_prepare_dataset(path_to_arff_file: str,
     # one-hot-encoding
     X = pd.get_dummies(X, prefix=categorical_columns)
 
-    # split into train/test
-    x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=SEED,
-                                                        shuffle=True, stratify=y)
-
-    return x_train, x_test, y_train, y_test
+    return X, y
