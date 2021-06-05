@@ -24,8 +24,8 @@ https://arxiv.org/abs/2102.08369
 
 
 Evaluation:
-1. simple model fitting on real data and test on generated.
-2. Table evaluator.
+1. simple model fitting on real data and test on generated. - Yishaia
+2. Table evaluator. - Yishaia
 3. statistic significance and visualization of distribution.
 4. euclidean distance from either - closest sample, or an average of all from same class (TBD).
 5. PCA/tSNE - observe/compare the clustering of lower dimensionality of both generated and real data.
