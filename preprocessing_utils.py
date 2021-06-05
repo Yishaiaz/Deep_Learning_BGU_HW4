@@ -113,6 +113,7 @@ def read_and_prepare_dataset(path_to_arff_file: str,
     y = transform_categorical_binary_column(y, target_column_name, labels_to_num_dict)
 
     # apply min-max scaler on all numeric columns
+    # todo: fix for correct pandas style
     X[numeric_columns] = pd.DataFrame(MinMaxScaler().fit_transform(X[numeric_columns].values), columns=numeric_columns, index=X.index)
 
     # align categorical column type
@@ -130,7 +131,8 @@ def read_and_prepare_dataset(path_to_arff_file: str,
     # remove binary categorical columns from the general categorical column list
     categorical_columns = [column for column in categorical_columns if column not in set(categorical_binary_columns)]
 
-    # one-hot-encoding
+    # one-hot-encoding,
+    # todo: move to sklearn one-hot encoder for fitted model (to inverse later)
     X = pd.get_dummies(X, prefix=categorical_columns)
 
     return X, y
