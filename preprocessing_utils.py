@@ -7,7 +7,7 @@ from pandas.api.types import is_numeric_dtype
 from pandas.api.types import is_string_dtype
 from scipy.io import arff
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, MinMaxScaler
+from sklearn.preprocessing import LabelEncoder, MinMaxScaler, OneHotEncoder
 from tensorflow.python.data import Dataset
 
 from global_vars import *
@@ -90,6 +90,21 @@ def split_into_train_test(X: pd.DataFrame,
     return x_train, x_test, y_train, y_test
 
 
+def encode_categorical_vars(df: pd.DataFrame, cols_to_encode: List) -> Tuple[pd.DataFrame, OneHotEncoder]:
+    def flatten_feature_arr(features_arrays: list):
+        flatten_arr = []
+        for inner_array in features_arrays:
+            flatten_arr += inner_array.tolist()
+        return flatten_arr
+    ohe = OneHotEncoder(categories='auto')
+    feature_arr = ohe.fit_transform(df[cols_to_encode]).toarray()
+    features_labels = ohe.categories_
+    dropped_df = df.drop(columns=cols_to_encode, inplace=False)
+    encoded_df = pd.DataFrame(feature_arr, columns=flatten_feature_arr(features_labels))
+    encoded_df = pd.concat([encoded_df, dropped_df], axis=1)
+    return encoded_df, ohe
+
+
 def read_and_prepare_dataset(path_to_arff_file: str,
                              labels_to_num_dict: dict,
                              decode_categorical_columns: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame]:
@@ -117,7 +132,7 @@ def read_and_prepare_dataset(path_to_arff_file: str,
     y = transform_categorical_binary_column(y, target_column_name, labels_to_num_dict)
 
     # apply min-max scaler on all numeric columns
-    X = X.apply(lambda col: MinMaxScaler().fit_transform(col) if col.name in numeric_columns else col)
+    X = X.apply(lambda col: MinMaxScaler().fit_transform(np.asarray(col).reshape(-1, 1)).flatten() if col.name in numeric_columns else col)
     # X[numeric_columns] = pd.DataFrame(MinMaxScaler().fit_transform(X[numeric_columns].values), columns=numeric_columns, index=X.index)
 
     # align categorical column type - doesn't seem to be necessary
@@ -134,11 +149,9 @@ def read_and_prepare_dataset(path_to_arff_file: str,
     #     X.loc[:, categorical_binary_column] = le.fit_transform(X[categorical_binary_column])
 
     # remove binary categorical columns from the general categorical column list
-    categorical_columns = np.delete(categorical_columns, categorical_binary_columns)
-    # categorical_columns = [column for column in categorical_columns if column not in set(categorical_binary_columns)]
-
+    categorical_columns = [column for column in categorical_columns if column not in set(categorical_binary_columns)]
+    #
     # one-hot-encoding,
-    # todo: move to sklearn one-hot encoder for fitted model (to inverse later)
-    X = pd.get_dummies(X, prefix=categorical_columns)
+    X, ohes = encode_categorical_vars(X, cols_to_encode=categorical_columns) # todo: return ohes as well for inverse transorm if necessary
 
     return X, y
