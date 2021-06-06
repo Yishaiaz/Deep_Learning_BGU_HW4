@@ -9,6 +9,8 @@ TODOS:
 1. create architectures for generator based on dataset type.
 2. implement Dense layer for each feature at generator. For each dataset create the appropriate implmetation.
 3. Gumbel softmax implementation as final layer for generator (categorical features only).
+https://www.youtube.com/watch?v=JFgXEbgcT7g&t=38s
+
 4. min-max scaler for [-1, 1] - TO DISCUSS AND DECIDE FIRST
 
 
