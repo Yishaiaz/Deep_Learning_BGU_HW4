@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Tuple, List
-
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 from pandas.api.types import is_numeric_dtype
@@ -30,8 +30,8 @@ def read_arff_file_as_dataframe(path_to_arff_file: str) -> pd.DataFrame:
 
 
 def transform_categorical_binary_column(df: pd.DataFrame, column_name: str, labels_to_num_dict: dict = None) -> pd.DataFrame:
-    df.loc[:, column_name] = df[column_name].apply(lambda x: labels_to_num_dict[x])
-
+    # df.loc[:, column_name] = df[column_name].apply(lambda x: labels_to_num_dict[x])
+    df = df.apply(lambda col: col.apply(lambda row: labels_to_num_dict[row]) if col.name == column_name else col)
     return df
 
 
@@ -50,15 +50,17 @@ def get_feature_to_type_mapping(df: pd.DataFrame) -> dict:
     return feature_to_type
 
 
-def gather_numeric_and_categorical_columns(df: pd.DataFrame) -> Tuple[List, List]:
-    numeric_columns = []
-    categorical_columns = []
-
-    for feature, feature_type in get_feature_to_type_mapping(df).items():
-        if feature_type.is_numeric():
-            numeric_columns.append(feature)
-        else:
-            categorical_columns.append(feature)
+def gather_numeric_and_categorical_columns(df: pd.DataFrame) -> Tuple[np.array, np.array]:
+    categorical_columns = df.select_dtypes(include=['object', 'category']).columns.values
+    numeric_columns = df.select_dtypes(include=['number']).columns.values
+    # numeric_columns = []
+    # categorical_columns = []
+    #
+    # for feature, feature_type in get_feature_to_type_mapping(df).items():
+    #     if feature_type.is_numeric():
+    #         numeric_columns.append(feature)
+    #     else:
+    #         categorical_columns.append(feature)
 
     return numeric_columns, categorical_columns
 
@@ -105,18 +107,20 @@ def read_and_prepare_dataset(path_to_arff_file: str,
 
     # iterate over all categorical columns and convert decode to string
     if decode_categorical_columns:
-        y.loc[:, target_column_name] = y[target_column_name].apply(lambda label: label.decode())
-        for categorical_column in categorical_columns:
-            X.loc[:, categorical_column] = X[categorical_column].apply(lambda x: x.decode())
+        y = y.apply(lambda col: col.str.decode(encoding='UTF-8'))
+        # y.loc[:, target_column_name] = y[target_column_name].apply(lambda label: label.decode())
+        X = X.apply(lambda col: col.str.decode(encoding='UTF-8') if col.name in categorical_columns else col)
+        # for categorical_column in categorical_columns:
+        #     X.loc[:, categorical_column] = X[categorical_column].apply(lambda x: x.decode())
 
     # transform label categorical binary column
     y = transform_categorical_binary_column(y, target_column_name, labels_to_num_dict)
 
     # apply min-max scaler on all numeric columns
-    # todo: fix for correct pandas style
-    X[numeric_columns] = pd.DataFrame(MinMaxScaler().fit_transform(X[numeric_columns].values), columns=numeric_columns, index=X.index)
+    X = X.apply(lambda col: MinMaxScaler().fit_transform(col) if col.name in numeric_columns else col)
+    # X[numeric_columns] = pd.DataFrame(MinMaxScaler().fit_transform(X[numeric_columns].values), columns=numeric_columns, index=X.index)
 
-    # align categorical column type
+    # align categorical column type - doesn't seem to be necessary
     col_type_mapping = {col: 'object' for col in categorical_columns}
     X = X.astype(col_type_mapping)
 
@@ -125,11 +129,13 @@ def read_and_prepare_dataset(path_to_arff_file: str,
 
     # transform categorical binary columns to 0/1
     le = LabelEncoder()
-    for categorical_binary_column in categorical_binary_columns:
-        X.loc[:, categorical_binary_column] = le.fit_transform(X[categorical_binary_column])
+    X = X.apply(lambda col: le.fit_transform(col) if col.name in categorical_binary_columns else col)
+    # for categorical_binary_column in categorical_binary_columns:
+    #     X.loc[:, categorical_binary_column] = le.fit_transform(X[categorical_binary_column])
 
     # remove binary categorical columns from the general categorical column list
-    categorical_columns = [column for column in categorical_columns if column not in set(categorical_binary_columns)]
+    categorical_columns = np.delete(categorical_columns, categorical_binary_columns)
+    # categorical_columns = [column for column in categorical_columns if column not in set(categorical_binary_columns)]
 
     # one-hot-encoding,
     # todo: move to sklearn one-hot encoder for fitted model (to inverse later)
