@@ -42,6 +42,11 @@ def section1():
                                     labels_to_num_dict={'tested_positive': 1,
                                                         'tested_negative': -1},
                                     decode_categorical_columns=True)
+    # german credit card dataset
+    # X, y = read_and_prepare_dataset(path_to_arff_file=GERMAN_CREDIT_PATH,
+    #                                 labels_to_num_dict={'1': 1,
+    #                                                     '2': 2},
+    #                                 decode_categorical_columns=True)
 
     # convert to tf.Dataset api
     ds = convert_x_y_to_tf_dataset(X, y, BATCH_SIZE)
