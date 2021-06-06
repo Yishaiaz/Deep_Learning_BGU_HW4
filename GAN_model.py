@@ -1,15 +1,19 @@
 import tensorflow as tf
+import numpy as np
 from keras.layers import BatchNormalization
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Dense
 from tensorflow.python.data import Dataset
 from tensorflow.python.keras.optimizer_v2.rmsprop import RMSprop
 
-from global_vars import LATENT_NOISE_SIZE, GENERATOR_LR, CRITIC_LR, CHECKPOINT_DIR, CHECKPOINT_PREFIX
+from global_vars import LATENT_NOISE_SIZE, GENERATOR_LR, CRITIC_LR, CHECKPOINT_DIR, CHECKPOINT_PREFIX, SEED
 
 
 class GAN:
     def __init__(self, **kwargs):
+        tf.random.set_seed(SEED)
+        np.random.seed(SEED)
+
         self._input_size = kwargs.get('input_size', None)
 
         if self._input_size is None:
