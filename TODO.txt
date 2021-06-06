@@ -9,6 +9,7 @@ TODOS:
 1. create architectures for generator based on dataset type.
 2. implement Dense layer for each feature at generator. For each dataset create the appropriate implmetation.
 3. Gumbel softmax implementation as final layer for generator (categorical features only).
+https://arxiv.org/pdf/1611.01144.pdf
 https://www.youtube.com/watch?v=JFgXEbgcT7g&t=38s
 
 4. min-max scaler for [-1, 1] - TO DISCUSS AND DECIDE FIRST
@@ -26,20 +27,11 @@ https://arxiv.org/abs/2102.08369
 
 
 Evaluation:
-1. simple model fitting on real data and test on generated. - Yishaia
+1. simple model fitting on real data and test on generated. - Yishaia DONE
 2. Table evaluator. - Yishaia
 3. statistic significance and visualization of distribution.
 4. euclidean distance from either - closest sample, or an average of all from same class (TBD).
 5. PCA/tSNE - observe/compare the clustering of lower dimensionality of both generated and real data.
 6. KL-divergence.
 
-0 0
-0 1
-1 0
-1 1
-
-0001
-0010
-0100
-1000
 
