@@ -11,6 +11,8 @@ TODOS:
 3. Gumbel softmax implementation as final layer for generator (categorical features only).
 https://arxiv.org/pdf/1611.01144.pdf
 https://www.youtube.com/watch?v=JFgXEbgcT7g&t=38s
+https://github.com/gugarosa/nalp/blob/master/nalp/models/layers/gumbel_softmax.py - implementation as a layer
+https://github.com/vithursant/VAE-Gumbel-Softmax/blob/master/notebooks/concrete_distribution.ipynb - usage withing regular softmax see cell 14
 
 4. min-max scaler for [-1, 1] - TO DISCUSS AND DECIDE FIRST
 
@@ -33,5 +35,3 @@ Evaluation:
 4. euclidean distance from either - closest sample, or an average of all from same class (TBD).
 5. PCA/tSNE - observe/compare the clustering of lower dimensionality of both generated and real data.
 6. KL-divergence.
-
-
