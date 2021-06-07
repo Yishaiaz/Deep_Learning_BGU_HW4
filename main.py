@@ -37,22 +37,22 @@ def plot_critic_accuracy(x: List, y: List, label1: str, x_axis: str, y_axis: str
 
 
 def section1():
+    tf.random.set_seed(SEED)
+    np.random.seed(SEED)
+
     # diabetes dataset
-    X, y = read_and_prepare_dataset(path_to_arff_file=DIABETES_PATH,
-                                    labels_to_num_dict={'tested_positive': 1,
-                                                        'tested_negative': -1},
-                                    decode_categorical_columns=True)
-    # german credit card dataset
-    # X, y = read_and_prepare_dataset(path_to_arff_file=GERMAN_CREDIT_PATH,
-    #                                 labels_to_num_dict={'1': 1,
-    #                                                     '2': 2},
-    #                                 decode_categorical_columns=True)
+    X, y, _ = read_and_prepare_dataset(path_to_arff_file=DIABETES_PATH,
+                                       labels_to_num_dict={'tested_positive': 1,
+                                                           'tested_negative': -1},
+                                       decode_categorical_columns=True)
+
+
 
     # convert to tf.Dataset api
     ds = convert_x_y_to_tf_dataset(X, y, BATCH_SIZE)
 
     # extract input size
-    input_size = x_train.shape[1]
+    input_size = X.shape[1]
 
     # initialize and train GAN model
     gan_model = GAN(input_size=input_size)
@@ -71,10 +71,10 @@ def section1():
     print(gan_model.generate_samples(3))
 
     # german_credit dataset
-    # x_train, x_test, y_train, y_test = read_and_prepare_dataset(path_to_arff_file=GERMAN_CREDIT_PATH,
-    #                                                             labels_to_num_dict={'2': 1,
-    #                                                                                 '1': -1},
-    #                                                             decode_categorical_columns=True)
+    X, y, ohe = read_and_prepare_dataset(path_to_arff_file=GERMAN_CREDIT_PATH,
+                                         labels_to_num_dict={'1': 1,
+                                                             '2': 2},
+                                         decode_categorical_columns=True)
 
 
 

@@ -1,32 +1,29 @@
-import numpy as np
-import pandas as pd
-from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
+
 from preprocessing_utils import *
+
 
 class SimpleCLFForEvaluation:
     def __init__(self, **kwargs):
-        self.df_path = kwargs.get('data_path', 'Data/diabetes.arff')
+        np.random.seed(SEED)
+
+        self.df_path = kwargs.get('data_path', DIABETES_PATH)
         self.model_type = kwargs.get('model', 'RandomForestClassifier')
-        self.model = None
         self.model_trained = False
         if self.model_type == 'RandomForestClassifier':
-            self.model = RandomForestClassifier()
+            self.model = RandomForestClassifier(random_state=SEED)
         elif self.model_type == 'GradientBoostingClassifier':
-            self.model = GradientBoostingClassifier()
+            self.model = GradientBoostingClassifier(random_state=SEED)
         elif self.model_type == 'LogisticRegression':
-            self.model = LogisticRegression()
+            self.model = LogisticRegression(random_state=SEED)
 
         self.labels_to_num_dict = kwargs.get('labels_to_num_dict', {'tested_positive': 1,
                                                                     'tested_negative': -1})
 
         self.data_x, self.data_y = read_and_prepare_dataset(self.df_path,
                                                             labels_to_num_dict=self.labels_to_num_dict)
-        self.X_train, self.X_test, self.y_train, self.y_test = train_test_split(self.data_x,
-                                                                                self.data_y,
-                                                                                test_size=0.30,
-                                                                                random_state=42)
+        self.X_train, self.X_test, self.y_train, self.y_test = split_into_train_test(self.data_x, self.data_y)
 
     def train_and_score_model(self):
         if self.model_trained:
@@ -42,7 +39,7 @@ class SimpleCLFForEvaluation:
     def score_model(self):
         return self.model.score(self.X_test, self.y_test)
 
-    def get_feature_importance(self):
+    def get_feature_importance(self):  # TODO why we need featrure importance?
         if self.model_type in ['RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier']:
             return self.model.feature_importances_
 
