@@ -45,3 +45,9 @@ Check:
 3. X = X.apply(lambda col: MinMaxScaler().fit_transform(np.asarray(col).reshape(-1, 1)).flatten() if col.name in numeric_columns else col)
 4. get_feature_importance
 
+========
+
+CONSIDER:
+1. different learning rate for discriminator and generator.
+2. Packing: the discriminator considers multiple samples (either fake or real or mix) each step - to avoid mode collapse.
+3. add dropout to discriminator.
