@@ -35,3 +35,12 @@ Evaluation:
 4. euclidean distance from either - closest sample, or an average of all from same class (TBD).
 5. PCA/tSNE - observe/compare the clustering of lower dimensionality of both generated and real data.
 6. KL-divergence.
+
+=======
+
+
+Check:
+2. transform_categorical_binary_column
+3. X = X.apply(lambda col: MinMaxScaler().fit_transform(np.asarray(col).reshape(-1, 1)).flatten() if col.name in numeric_columns else col)
+4. get_feature_importance
+
