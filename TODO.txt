@@ -36,6 +36,7 @@ Evaluation:
 5. PCA/tSNE - observe/compare the clustering of lower dimensionality of both generated and real data.
 6. KL-divergence.
 
+LIAD:
 =======
 
 
