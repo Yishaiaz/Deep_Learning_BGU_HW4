@@ -24,7 +24,7 @@ class SimpleCLFForEvaluation:
 
         self.labels_to_num_dict = labels_to_num_dict
 
-        self.data_x, self.data_y = read_and_prepare_dataset(self.data_path,
+        self.data_x, self.data_y, ohe = read_and_prepare_dataset(self.data_path,
                                                             labels_to_num_dict=self.labels_to_num_dict)
         self.X_train, self.X_test, self.y_train, self.y_test = split_into_train_test(self.data_x, self.data_y)
 
