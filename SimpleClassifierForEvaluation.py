@@ -5,12 +5,16 @@ from preprocessing_utils import *
 
 
 class SimpleCLFForEvaluation:
-    def __init__(self, **kwargs):
+    def __init__(self,
+                 labels_to_num_dict: dict,
+                 model_type: str = 'RandomForestClassifier',
+                 data_path: str = DIABETES_PATH):
         np.random.seed(SEED)
 
-        self.df_path = kwargs.get('data_path', DIABETES_PATH)
-        self.model_type = kwargs.get('model', 'RandomForestClassifier')
+        self.data_path = data_path
+        self.model_type = model_type
         self.model_trained = False
+
         if self.model_type == 'RandomForestClassifier':
             self.model = RandomForestClassifier(random_state=SEED)
         elif self.model_type == 'GradientBoostingClassifier':
@@ -18,10 +22,9 @@ class SimpleCLFForEvaluation:
         elif self.model_type == 'LogisticRegression':
             self.model = LogisticRegression(random_state=SEED)
 
-        self.labels_to_num_dict = kwargs.get('labels_to_num_dict', {'tested_positive': 1,
-                                                                    'tested_negative': -1})
+        self.labels_to_num_dict = labels_to_num_dict
 
-        self.data_x, self.data_y = read_and_prepare_dataset(self.df_path,
+        self.data_x, self.data_y = read_and_prepare_dataset(self.data_path,
                                                             labels_to_num_dict=self.labels_to_num_dict)
         self.X_train, self.X_test, self.y_train, self.y_test = split_into_train_test(self.data_x, self.data_y)
 
