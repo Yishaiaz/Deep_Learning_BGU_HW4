@@ -8,7 +8,7 @@ BiGAN? - to create good embeddings representation.
 TODOS:
 1. create architectures for generator based on dataset type.
 2. implement Dense layer for each feature at generator. For each dataset create the appropriate implmetation.
-3. Gumbel softmax implementation as final layer for generator (categorical features only).
+3. Gumbel softmax implementation as final layer for generator (categorical features only). - DONE
 https://arxiv.org/pdf/1611.01144.pdf
 https://www.youtube.com/watch?v=JFgXEbgcT7g&t=38s
 https://github.com/gugarosa/nalp/blob/master/nalp/models/layers/gumbel_softmax.py - implementation as a layer
