@@ -66,24 +66,24 @@ def split_into_train_test(X: pd.DataFrame,
     return x_train, x_test, y_train, y_test
 
 
-def encode_categorical_vars(df: pd.DataFrame, cols_to_encode: List) -> Tuple[pd.DataFrame, OneHotEncoder]:
+def encode_categorical_vars(df: pd.DataFrame, col_to_encode: str, column_to_ohe: dict) -> Tuple[pd.DataFrame, OneHotEncoder]:
     def flatten_feature_arr(features_arrays: list):
         flatten_arr = []
         for inner_array in features_arrays:
             flatten_arr += inner_array.tolist()
         return flatten_arr
-    ohe = OneHotEncoder(categories='auto')
-    feature_arr = ohe.fit_transform(df[cols_to_encode]).toarray()
+    ohe = column_to_ohe[col_to_encode]
+    feature_arr = ohe.fit_transform(df[[col_to_encode]]).toarray()
     features_labels = ohe.categories_
-    dropped_df = df.drop(columns=cols_to_encode, inplace=False)
+    dropped_df = df.drop(columns=[col_to_encode], inplace=False)
     encoded_df = pd.DataFrame(feature_arr, columns=flatten_feature_arr(features_labels))
-    encoded_df = pd.concat([encoded_df, dropped_df], axis=1)
+    encoded_df = pd.concat([dropped_df, encoded_df], axis=1)
     return encoded_df, ohe
 
 
 def read_and_prepare_dataset(path_to_arff_file: str,
                              labels_to_num_dict: dict,
-                             decode_categorical_columns: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame, OneHotEncoder]:
+                             decode_categorical_columns: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame, dict, dict]:
     tf.random.set_seed(SEED)
     np.random.seed(SEED)
 
@@ -107,19 +107,35 @@ def read_and_prepare_dataset(path_to_arff_file: str,
     y = transform_categorical_binary_column(y, target_column_name, labels_to_num_dict)
 
     # apply min-max scaler on all numeric columns
-    X = X.apply(lambda col: MinMaxScaler(feature_range=(-1, 1)).fit_transform(np.asarray(col).reshape(-1, 1)).flatten() if col.name in numeric_columns else col)
+    column_to_scaler = {column: MinMaxScaler(feature_range=(-1, 1)) for column in numeric_columns}
 
-    # find all categorical binary columns
-    categorical_binary_columns = find_all_binary_columns(X[categorical_columns])
+    for col in numeric_columns:
+        X.loc[:, col] = column_to_scaler[col].fit_transform(X[[col]])
 
-    # transform categorical binary columns to 0/1
-    le = LabelEncoder()
-    X = X.apply(lambda col: le.fit_transform(col) if col.name in categorical_binary_columns else col)
+    # # find all categorical binary columns
+    # categorical_binary_columns = find_all_binary_columns(X[categorical_columns])
+    #
+    # # transform categorical binary columns to 0/1
+    # le = LabelEncoder()
+    # X = X.apply(lambda col: le.fit_transform(col) if col.name in categorical_binary_columns else col)
+    #
+    # # remove binary categorical columns from the general categorical column list and get new numeric columns
+    # numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(X)
 
-    # remove binary categorical columns from the general categorical column list
-    categorical_columns = [column for column in categorical_columns if column not in set(categorical_binary_columns)]
+    # one-hot-encoding
+    column_to_ohe = {column: OneHotEncoder(categories='auto') for column in categorical_columns}
+    for col in categorical_columns:
+        X, ohe = encode_categorical_vars(X, col_to_encode=col, column_to_ohe=column_to_ohe)
 
-    # one-hot-encoding,
-    X, ohe = encode_categorical_vars(X, cols_to_encode=categorical_columns) # todo: return ohes as well for inverse transorm if necessary
+    # maps column idx to ohe and scaler
+    column_idx_to_ohe = {}
+    prev_column_categories = 0
+    for col in categorical_columns:
+        ohe = column_to_ohe[col]
+        column_idx = len(numeric_columns) + prev_column_categories
+        column_idx_to_ohe[column_idx] = ohe
+        prev_column_categories = prev_column_categories + len(ohe.categories_[0])
 
-    return X, y, ohe
+    column_idx_to_scaler = {X.columns.get_loc(col): column_to_scaler[col] for col in numeric_columns}
+
+    return X, y, column_idx_to_scaler, column_idx_to_ohe

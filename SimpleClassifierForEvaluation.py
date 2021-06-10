@@ -24,8 +24,9 @@ class SimpleCLFForEvaluation:
 
         self.labels_to_num_dict = labels_to_num_dict
 
-        self.data_x, self.data_y, ohe = read_and_prepare_dataset(self.data_path,
-                                                            labels_to_num_dict=self.labels_to_num_dict)
+        self.data_x, self.data_y, _, _ = read_and_prepare_dataset(self.data_path,
+                                                                  labels_to_num_dict=self.labels_to_num_dict,
+                                                                  decode_categorical_columns=True)
         self.X_train, self.X_test, self.y_train, self.y_test = split_into_train_test(self.data_x, self.data_y)
 
     def train_and_score_model(self):
@@ -36,7 +37,7 @@ class SimpleCLFForEvaluation:
         print(f'model score on real data: {model_score}')
 
     def train_model(self):
-        self.model.fit(self.X_train, self.y_train)
+        self.model.fit(self.X_train, self.y_train.iloc[:, 0].values)
         self.model_trained = True
 
     def score_model(self):
@@ -48,3 +49,4 @@ class SimpleCLFForEvaluation:
 
         elif self.model_type in ['LogisticRegression']:
             return self.model.coef_
+
