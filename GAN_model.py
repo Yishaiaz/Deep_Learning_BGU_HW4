@@ -75,7 +75,7 @@ class GAN:
 
         layers = []
         for column_size in self._columns_size:
-            if column_size > 1:
+            if column_size == 1:
                 layers.append(Dense(1, activation='tanh')(x))
             else:
                 layers.append(Dense(column_size, activation='softmax')(x))
@@ -201,8 +201,6 @@ class GAN:
             g_loss_per_epoch.append(g_loss_epoch / batch_size)
             c_acc_per_epoch.append(c_acc_epoch / batch_size)
 
-            # logging
-            print("epoch {} critic - c_loss: {} - c_accuracy: {}, generator - g_loss: {}".format(epoch, c_loss_per_epoch[-1], c_acc_per_epoch[-1], g_loss_per_epoch[-1]))
 
             # models checkpoint - save the model every n_checkpoint (default=10) epochs
             if (epoch + 1) % n_checkpoint == 0:

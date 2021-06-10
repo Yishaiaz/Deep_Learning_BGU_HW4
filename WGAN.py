@@ -246,7 +246,9 @@ class WGAN(Model):
     def generate_samples(self,
                          column_idx_to_scaler: dict,
                          column_idx_to_ohe: dict,
-                         num_samples: int = 1):
+                         num_samples: int = 1,
+                         negative_labels: int = 500,
+                         positive_labels: int = 268):
         # sample random noise latent vectors
         random_latent_vectors = tf.random.normal(shape=(num_samples, self._latent_noise_size))
         # sample random labels
