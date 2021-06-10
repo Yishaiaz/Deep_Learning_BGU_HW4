@@ -84,6 +84,7 @@ def evaluate_using_tsne(samples, labels, df_columns, index):
     numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df)
     tsne(df, categorical_columns, hue='class', filename=f'training_info/{index}_tsne', save_figure=True)
 
+
 class GanSampleGenerator:
     def __init__(self,
                  latent_noise_size: int,

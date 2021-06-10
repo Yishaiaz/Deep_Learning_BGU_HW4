@@ -165,11 +165,11 @@ class CGAN:
         """train the generator and discriminator"""
 
         for epoch in range(n_epochs):
-            d_loss1_epoch = 0.
-            d_loss2_epoch = 0.
-            g_loss_epoch = 0.
-            d_acc1_epoch = 0.
-            d_acc2_epoch = 0.
+            d_loss1_epoch = []
+            d_loss2_epoch = []
+            g_loss_epoch = []
+            d_acc1_epoch = []
+            d_acc2_epoch = []
 
             # enumerate batches over the training set
             for X_batch, y_batch in dataset:
@@ -202,20 +202,20 @@ class CGAN:
                 else:
                     g_loss = self.gan.train_on_batch(z_input, y_gan)
 
-                g_loss_epoch += g_loss
-                d_loss1_epoch += d_loss1
-                d_loss2_epoch += d_loss2
-                d_acc1_epoch += d_acc1
-                d_acc2_epoch += d_acc2
+                g_loss_epoch.append(g_loss)
+                d_loss1_epoch.append(d_loss1)
+                d_loss2_epoch.append(d_loss2)
+                d_acc1_epoch.append(d_acc1)
+                d_acc2_epoch.append(d_acc2)
 
             # logging
             print("epoch {} discriminator - d_loss1: {} - d_loss2: {} - d_acc1: {} - d_acc2: {}, generator - g_loss: {}"
                   .format(epoch,
-                          d_loss1_epoch / batch_size,
-                          d_loss2_epoch / batch_size,
-                          d_acc1_epoch / batch_size,
-                          d_acc2_epoch / batch_size,
-                          g_loss_epoch / batch_size))
+                          np.mean(d_loss1_epoch),
+                          np.mean(d_loss2_epoch),
+                          np.mean(d_acc1_epoch),
+                          np.mean(d_acc2_epoch),
+                          np.mean(g_loss_epoch)))
 
             # summarize performance
             samples, generated_samples, labels = gan_sample_generator.generate_samples(self.generator)
