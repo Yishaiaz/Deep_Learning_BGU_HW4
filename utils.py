@@ -1,16 +1,47 @@
+import logging
 from typing import List, Tuple
 
-import numpy as np
+import os
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
-import tensorflow as tf
-from numpy.random import randn
 import seaborn as sns
+import tensorflow as tf
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.manifold import TSNE
 
 from global_vars import SEED
 from preprocessing_utils import gather_numeric_and_categorical_columns
+
+
+def log(path, file):
+    # check if the file exist
+    log_file = os.path.join(path, file)
+
+    if not os.path.isfile(log_file):
+        open(log_file, "w+").close()
+
+    console_logging_format = "%(message)s"
+    file_logging_format = "%(message)s"
+
+    # configure logger
+    logging.basicConfig(level=logging.INFO, format=console_logging_format)
+    logger = logging.getLogger(file)
+
+    # create a file handler for output file
+    handler = logging.FileHandler(log_file)
+
+    # set the logging level for log file
+    handler.setLevel(logging.INFO)
+
+    # create a logging format
+    formatter = logging.Formatter(file_logging_format)
+    handler.setFormatter(formatter)
+
+    # add the handlers to the logger
+    logger.addHandler(handler)
+
+    return logger
 
 
 def plot_critic_generator_loss(x1: List, y1: List, x2: List, y2: List, label1: str, label2: str, x_axis: str, y_axis: str, title: str):

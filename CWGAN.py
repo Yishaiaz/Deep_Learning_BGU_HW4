@@ -204,7 +204,7 @@ class CWGAN:
 
         return X, labels_input, y
 
-    def train(self, X, y, batch_size, gan_sample_generator, X_test, y_test, n_epochs, df_columns, experiment_dir):
+    def train(self, X, y, batch_size, gan_sample_generator, X_test, y_test, n_epochs, df_columns, experiment_dir, logger):
         """train the generator and critic"""
 
         # calculate the number of batches per training epoch
@@ -257,7 +257,7 @@ class CWGAN:
             g_hist.append(g_loss)
 
             # summarize loss on this batch
-            print("step {} critic - c_loss1: {} - c_loss2: {}, generator - g_loss: {}".format(i + 1, c1_hist[-1], c2_hist[-1], g_loss))
+            logger.info("step {} critic - c_loss1: {} - c_loss2: {}, generator - g_loss: {}".format(i + 1, c1_hist[-1], c2_hist[-1], g_loss))
 
             # evaluate the model performance every 'epoch'
             if (i + 1) % batches_per_epoch == 0:
@@ -268,9 +268,9 @@ class CWGAN:
                 # evaluate using machine learning efficacy
                 score_for_fixed_latent_noise = evaluate_machine_learning_efficacy(generated_samples_fixed_latent_noise, labels, X_test, y_test)
                 score_for_random_latent_noise = evaluate_machine_learning_efficacy(generated_samples_random_latent_noisee, labels, X_test, y_test)
-                print("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
-                                                                                                          score_for_fixed_latent_noise,
-                                                                                                          score_for_random_latent_noise))
+                logger.info("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
+                                                                                                                score_for_fixed_latent_noise,
+                                                                                                                score_for_random_latent_noise))
 
                 if score_for_fixed_latent_noise > max_score_for_fixed_latent_noise:
                     max_score_for_fixed_latent_noise = score_for_fixed_latent_noise

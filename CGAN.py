@@ -161,7 +161,7 @@ class CGAN:
 
         return X, labels_input, y
 
-    def train(self, dataset, batch_size, gan_sample_generator, X_test, y_test, n_epochs, df_columns, experiment_dir):
+    def train(self, dataset, batch_size, gan_sample_generator, X_test, y_test, n_epochs, df_columns, experiment_dir, logger):
         """train the generator and discriminator"""
 
         max_score_for_fixed_latent_noise = 0.
@@ -208,7 +208,7 @@ class CGAN:
                 d_acc2_epoch.append(d_acc2)
 
             # logging
-            print("epoch {} discriminator - d_loss1: {} - d_loss2: {} - d_acc1: {} - d_acc2: {}, generator - g_loss: {}"
+            logger.info("epoch {} discriminator - d_loss1: {} - d_loss2: {} - d_acc1: {} - d_acc2: {}, generator - g_loss: {}"
                   .format(epoch,
                           np.mean(d_loss1_epoch),
                           np.mean(d_loss2_epoch),
@@ -224,9 +224,9 @@ class CGAN:
             score_for_fixed_latent_noise = evaluate_machine_learning_efficacy(generated_samples_fixed_latent_noise, labels, X_test, y_test)
             score_for_random_latent_noise = evaluate_machine_learning_efficacy(generated_samples_random_latent_noisee, labels, X_test, y_test)
 
-            print("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
-                                                                                                      score_for_fixed_latent_noise,
-                                                                                                      score_for_random_latent_noise))
+            logger.info("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
+                                                                                                            score_for_fixed_latent_noise,
+                                                                                                            score_for_random_latent_noise))
 
             if score_for_fixed_latent_noise > max_score_for_fixed_latent_noise:
                 max_score_for_fixed_latent_noise = score_for_fixed_latent_noise

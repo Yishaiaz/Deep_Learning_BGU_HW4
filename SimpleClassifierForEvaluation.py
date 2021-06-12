@@ -34,7 +34,8 @@ class SimpleCLFForEvaluation:
             raise RuntimeWarning('already trained')
         self.train_model()
         model_score = self.score_model()
-        print(f'model score on real data: {model_score}')
+
+        return model_score
 
     def train_model(self):
         self.model.fit(self.X_train, self.y_train.iloc[:, 0].values)

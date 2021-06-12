@@ -4,13 +4,13 @@ from CGAN import CGAN
 from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from random_forest_model import *
-from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history
+from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log
 
 np_config.enable_numpy_behavior()
 
 
 def train_cgan(ds, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
-               df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir):
+               df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger):
     cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
                                               column_idx_to_scaler,
@@ -28,7 +28,8 @@ def train_cgan(ds, input_size, columns_size, num_classes,  column_idx_to_scaler,
                                                    X_test, y_test,
                                                    N_EPOCHS,
                                                    df_columns,
-                                                   experiment_dir)
+                                                   experiment_dir,
+                                                   logger)
 
     # line plots of loss
     plot_loss_history(d_loss1_epoch, d_loss2_epoch, g_loss_epoch, experiment_dir)
@@ -36,13 +37,14 @@ def train_cgan(ds, input_size, columns_size, num_classes,  column_idx_to_scaler,
     # line plots of accuracy
     plot_accuracy_history(d_acc1_epoch, d_acc2_epoch, experiment_dir)
 
-    print()
-    print("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(max_score_for_fixed_latent_noise,
-                                                                                          max_score_for_random_latent_noise))
+    logger.info("")
+    logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
+        max_score_for_fixed_latent_noise,
+        max_score_for_random_latent_noise))
 
 
 def train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
-                df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir):
+                df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger):
     gan = CWGAN(input_size, columns_size, num_classes,
                 is_label_conditional=IS_LABEL_CONDITIONAL, positive_negative_labels=positive_negative_labels)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
@@ -55,14 +57,15 @@ def train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scale
                                               evaluation_mode=True,
                                               positive_negative_labels=positive_negative_labels)
     c1_hist, c2_hist, g_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
-        X_test, y_test, N_EPOCHS, df_columns, experiment_dir)
+        X_test, y_test, N_EPOCHS, df_columns, experiment_dir, logger)
 
     # line plots of loss
     plot_loss_history(c1_hist, c2_hist, g_hist, experiment_dir)
 
-    print()
-    print("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(max_score_for_fixed_latent_noise,
-                                                                                          max_score_for_random_latent_noise))
+    logger.info("")
+    logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
+        max_score_for_fixed_latent_noise,
+        max_score_for_random_latent_noise))
 
 # def train_gan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
 #                columns, X_test, y_test):
@@ -138,16 +141,19 @@ def train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scale
 #
 
 def classifier_evaluation(labels_to_num_dict: dict,
-                          data_path: str):
-    print(f"Train RandomForestClassifier model on {data_path} data and evaluate")
+                          data_path: str,
+                          logger):
+    logger.info(f"Train RandomForestClassifier model on {data_path} data and evaluate")
     model = SimpleCLFForEvaluation(labels_to_num_dict)
-    model.train_and_score_model()
-    print()
+    score = model.train_and_score_model()
+    logger.info(f'model score on real data: {score}')
+    logger.info("")
 
-    print(f"Train LogisticRegression model on {data_path} data and evaluate")
+    logger.info(f"Train LogisticRegression model on {data_path} data and evaluate")
     model = SimpleCLFForEvaluation(labels_to_num_dict, model_type='LogisticRegression')
-    model.train_and_score_model()
-    print()
+    score = model.train_and_score_model()
+    logger.info(f'model score on real data: {score}')
+    logger.info("")
 
     return model.X_test, model.y_test
 
@@ -192,9 +198,6 @@ def section1():
     # extract number of training samples
     num_samples = X.shape[0]
 
-    # classifier evaluation
-    X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path)
-
     experiment_name = "mode={}_epochs={}_batch={}_c_lr={}_g_lr={}_is_conditional={}_c_steps={}_c_dropout={}_noise_size={}_seed={}".format(
         GAN_MODE,
         N_EPOCHS,
@@ -211,14 +214,22 @@ def section1():
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
 
+    log_filename = os.sep.join([experiment_dir, f'{experiment_name}.txt'])
+
+    logger = log(".", log_filename)
+    logger.info("#################################################################")
+
+    # classifier evaluation
+    X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path, logger)
+
     if GAN_MODE == 'cgan':
         positive_negative_labels = [0, 1]
         train_cgan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
-                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir)
+                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
     else:
         positive_negative_labels = [1, -1]
         train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
-                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir)
+                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
 
 
     # initialize and train GAN model for diabetes dataset
