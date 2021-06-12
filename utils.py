@@ -3,6 +3,7 @@ from typing import List, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
+import tensorflow as tf
 from numpy.random import randn
 import seaborn as sns
 from sklearn.ensemble import RandomForestClassifier
@@ -41,13 +42,22 @@ def plot_critic_accuracy(x: List, y: List, label1: str, x_axis: str, y_axis: str
     plt.show()
 
 
-def plot_history(d1_hist, d2_hist, g_hist):
-    # plot history
+def plot_loss_history(d1_hist, d2_hist, g_hist, experiment_dir):
+    # plot loss history
     plt.plot(d1_hist, label='crit_real')
     plt.plot(d2_hist, label='crit_fake')
     plt.plot(g_hist, label='gen')
     plt.legend()
-    plt.savefig('plot_line_plot_loss.png')
+    plt.savefig(f'{experiment_dir}/loss_plot.png')
+    plt.close()
+
+
+def plot_accuracy_history(d1_acc, d2_acc, experiment_dir):
+    # plot accuracy
+    plt.plot(d1_acc, label='crit_real')
+    plt.plot(d2_acc, label='crit_fake')
+    plt.legend()
+    plt.savefig(f'{experiment_dir}/accuracy_plot.png')
     plt.close()
 
 
@@ -79,10 +89,10 @@ def evaluate_machine_learning_efficacy(generated_samples, labels, X_test, y_test
     return model.score(X_test, y_test)
 
 
-def evaluate_using_tsne(samples, labels, df_columns, index):
+def evaluate_using_tsne(samples, labels, df_columns, index, dir):
     df = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1), columns=df_columns + ['class'])
     numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df)
-    tsne(df, categorical_columns, hue='class', filename=f'training_info/{index}_tsne', save_figure=True)
+    tsne(df, categorical_columns, hue='class', filename=f'{dir}/{index}_tsne', save_figure=True)
 
 
 class GanSampleGenerator:
@@ -113,7 +123,7 @@ class GanSampleGenerator:
 
         if self.evaluation_mode:
             # sample random noise latent vectors
-            self.z_input = np.random.randn(self.latent_noise_size * self.num_samples)
+            self.z_input = tf.random.truncated_normal(shape=[self.latent_noise_size * self.num_samples]).numpy()
             # reshape into a batch of inputs for the network
             self.z_input = self.z_input.reshape(self.num_samples, self.latent_noise_size)
 
@@ -124,12 +134,12 @@ class GanSampleGenerator:
             self.negative_labels = np.full((self.num_positive_negative_classes[0],), self.positive_negative_labels[0])
             self.labels_input = np.concatenate((self.positive_labels, self.negative_labels))
 
-    def generate_samples(self, generator):
-        if self.evaluation_mode:
+    def generate_samples(self, generator, random_latent_noise: bool = False):
+        if not random_latent_noise and self.evaluation_mode:
             z_input = self.z_input
         else:
             # sample random noise latent vectors
-            z_input = np.random.randn(self.latent_noise_size * self.num_samples)
+            z_input = tf.random.truncated_normal(shape=[self.latent_noise_size * self.num_samples]).numpy()
             # reshape into a batch of inputs for the network
             z_input = z_input.reshape(self.num_samples, self.latent_noise_size)
 
@@ -137,7 +147,7 @@ class GanSampleGenerator:
             labels = self.labels_input
         else:
             # sample random labels
-            labels = np.random.choice(self.num_positive_negative_classes, self.num_samples)
+            labels = np.random.choice(self.positive_negative_labels, self.num_samples)
 
         # generate samples using generator model
         if self.is_label_conditional:

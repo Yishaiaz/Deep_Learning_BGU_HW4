@@ -32,7 +32,7 @@ class CGAN:
         self._latent_noise_size = latent_noise_size
         self._is_label_conditional = is_label_conditional
 
-        self._generator_activation_function = kwargs.get('generator_activation_function', 'relu')
+        self._generator_activation_function = kwargs.get('generator_activation_function', LeakyReLU(alpha=0.2))
         self._discriminator_activation_function = kwargs.get('discriminator_activation_function', LeakyReLU(alpha=0.2))
         self._generator_lr = kwargs.get('generator_lr', GENERATOR_LR)
         self._discriminator_lr = kwargs.get('discriminator_lr', CRITIC_LR)
@@ -54,10 +54,10 @@ class CGAN:
         else:
             input_in = sample_input
 
-        x = Dense(256, activation=self._discriminator_activation_function)(input_in)
+        x = Dense(128, activation=self._discriminator_activation_function)(input_in)
         x = BatchNormalization()(x)
         x = Dropout(self._discriminator_dropout)(x)
-        x = Dense(256, activation=self._discriminator_activation_function)(x)
+        x = Dense(128, activation=self._discriminator_activation_function)(x)
         x = BatchNormalization()(x)
         x = Dropout(self._discriminator_dropout)(x)
         output = Dense(1, activation='sigmoid')(x)
@@ -137,7 +137,7 @@ class CGAN:
     def generate_latent_points(self, n_samples):
         """generate points in latent space as input for the generator"""
         # generate points in the latent space
-        z_input = randn(self._latent_noise_size * n_samples)
+        z_input = tf.random.truncated_normal(shape=[self._latent_noise_size * n_samples]).numpy()
         # reshape into a batch of inputs for the network
         z_input = z_input.reshape(n_samples, self._latent_noise_size)
         # generate labels
@@ -161,15 +161,14 @@ class CGAN:
 
         return X, labels_input, y
 
-    def train(self, dataset, batch_size, gan_sample_generator, X_test, y_test, n_epochs, df_columns):
+    def train(self, dataset, batch_size, gan_sample_generator, X_test, y_test, n_epochs, df_columns, experiment_dir):
         """train the generator and discriminator"""
 
+        max_score_for_fixed_latent_noise = 0.
+        max_score_for_random_latent_noise = 0.
+
         for epoch in range(n_epochs):
-            d_loss1_epoch = []
-            d_loss2_epoch = []
-            g_loss_epoch = []
-            d_acc1_epoch = []
-            d_acc2_epoch = []
+            d_loss1_epoch, d_loss2_epoch, g_loss_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch = list(), list(), list(), list(), list(), list()
 
             # enumerate batches over the training set
             for X_batch, y_batch in dataset:
@@ -218,11 +217,29 @@ class CGAN:
                           np.mean(g_loss_epoch)))
 
             # summarize performance
-            samples, generated_samples, labels = gan_sample_generator.generate_samples(self.generator)
+            samples_fixed_latent_noise, generated_samples_fixed_latent_noise, labels = gan_sample_generator.generate_samples(self.generator)
+            samples_random_latent_noise, generated_samples_random_latent_noisee, labels = gan_sample_generator.generate_samples(self.generator, random_latent_noise=True)
 
             # evaluate using machine learning efficacy
-            score = evaluate_machine_learning_efficacy(generated_samples, labels, X_test, y_test)
-            print("epoch {} ML efficacy score: {}".format(epoch, score))
+            score_for_fixed_latent_noise = evaluate_machine_learning_efficacy(generated_samples_fixed_latent_noise, labels, X_test, y_test)
+            score_for_random_latent_noise = evaluate_machine_learning_efficacy(generated_samples_random_latent_noisee, labels, X_test, y_test)
 
-            # evaluate using tsne
-            evaluate_using_tsne(samples, labels, df_columns, epoch)
+            print("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
+                                                                                                      score_for_fixed_latent_noise,
+                                                                                                      score_for_random_latent_noise))
+
+            if score_for_fixed_latent_noise > max_score_for_fixed_latent_noise:
+                max_score_for_fixed_latent_noise = score_for_fixed_latent_noise
+
+                # save models
+                self.generator.save(f"{experiment_dir}/generator.h5")
+                self.discriminator.save(f"{experiment_dir}/discriminator.h5")
+                self.gan.save(f"{experiment_dir}/gan.h5")
+
+                # evaluate using tsne
+                evaluate_using_tsne(samples_fixed_latent_noise, labels, df_columns, epoch, experiment_dir)
+
+            if score_for_random_latent_noise > max_score_for_random_latent_noise:
+                max_score_for_random_latent_noise = score_for_random_latent_noise
+
+        return d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch,  d_acc2_epoch, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise

@@ -1,122 +1,141 @@
 from tensorflow.python.ops.numpy_ops import np_config
 
 from CGAN import CGAN
-from GAN_model import GAN
-from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
-from WGAN import GANMonitor, WGAN
 from CWGAN import CWGAN
+from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from random_forest_model import *
-from utils import plot_critic_generator_loss, plot_critic_accuracy, plot_history, GanSampleGenerator
+from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history
 
-np_config.enable_numpy_behavior()  # TODO check
+np_config.enable_numpy_behavior()
 
 
 def train_cgan(ds, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
-               df_columns, X_test, y_test):
+               df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir):
     cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
                                               column_idx_to_scaler,
                                               column_idx_to_ohe,
                                               columns_size,
                                               num_samples,
-                                              is_label_conditional=True,
-                                              num_positive_negative_classes=(500, 268),
+                                              is_label_conditional=IS_LABEL_CONDITIONAL,
+                                              num_positive_negative_classes=num_positive_negative_classes,
                                               evaluation_mode=True,
-                                              positive_negative_labels=[0, 1])
-    cgan.train(ds, BATCH_SIZE, gan_sample_generator, X_test, y_test, N_EPOCHS, df_columns)
+                                              positive_negative_labels=positive_negative_labels)
+    d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch, max_score_for_fixed_latent_noise, \
+    max_score_for_random_latent_noise = cgan.train(ds,
+                                                   BATCH_SIZE,
+                                                   gan_sample_generator,
+                                                   X_test, y_test,
+                                                   N_EPOCHS,
+                                                   df_columns,
+                                                   experiment_dir)
+
+    # line plots of loss
+    plot_loss_history(d_loss1_epoch, d_loss2_epoch, g_loss_epoch, experiment_dir)
+
+    # line plots of accuracy
+    plot_accuracy_history(d_acc1_epoch, d_acc2_epoch, experiment_dir)
+
+    print()
+    print("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(max_score_for_fixed_latent_noise,
+                                                                                          max_score_for_random_latent_noise))
 
 
 def train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
-                df_columns, X_test, y_test):
+                df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir):
     gan = CWGAN(input_size, columns_size, num_classes,
-                is_label_conditional=IS_LABEL_CONDITIONAL, positive_negative_labels=[1, -1])
+                is_label_conditional=IS_LABEL_CONDITIONAL, positive_negative_labels=positive_negative_labels)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
                                               column_idx_to_scaler,
                                               column_idx_to_ohe,
                                               columns_size,
                                               num_samples,
-                                              is_label_conditional=True,
-                                              num_positive_negative_classes=(500, 268),
+                                              is_label_conditional=IS_LABEL_CONDITIONAL,
+                                              num_positive_negative_classes=num_positive_negative_classes,
                                               evaluation_mode=True,
-                                              positive_negative_labels=[1, -1])
-    c1_hist, c2_hist, g_hist = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
-                                         X_test, y_test, N_EPOCHS, df_columns)
+                                              positive_negative_labels=positive_negative_labels)
+    c1_hist, c2_hist, g_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
+        X_test, y_test, N_EPOCHS, df_columns, experiment_dir)
 
     # line plots of loss
-    plot_history(c1_hist, c2_hist, g_hist)
+    plot_loss_history(c1_hist, c2_hist, g_hist, experiment_dir)
 
-def train_gan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
-               columns, X_test, y_test):
-    # Instantiate the WGAN model.
-    gan = GAN(input_size, columns_size, num_classes)
+    print()
+    print("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(max_score_for_fixed_latent_noise,
+                                                                                          max_score_for_random_latent_noise))
 
-    # # configure checkpoint to save the critic and generator models during the training process
-    # checkpoint = tf.train.Checkpoint(generator_optimizer=wgan.generator_optimizer,
-    #                                  critic_optimizer=wgan.critic_optimizer,
-    #                                  generator=wgan.generator,
-    #                                  critic=wgan.critic)
-    #
-    # # Instantiate GANMonitor Keras callback.
-    # evaluate_cbk = GANMonitor(column_idx_to_scaler=column_idx_to_scaler,
-    #                           column_idx_to_ohe=column_idx_to_ohe,
-    #                           checkpoint=checkpoint,
-    #                           num_samples=num_samples,
-    #                           columns=columns,
-    #                           X_test=X_test,
-    #                           y_test=y_test)
-    #
-    # tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=TF_LOGS_PATH)
+# def train_gan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
+#                columns, X_test, y_test):
+#     # Instantiate the WGAN model.
+#     gan = GAN(input_size, columns_size, num_classes)
+#
+#     # # configure checkpoint to save the critic and generator models during the training process
+#     # checkpoint = tf.train.Checkpoint(generator_optimizer=wgan.generator_optimizer,
+#     #                                  critic_optimizer=wgan.critic_optimizer,
+#     #                                  generator=wgan.generator,
+#     #                                  critic=wgan.critic)
+#     #
+#     # # Instantiate GANMonitor Keras callback.
+#     # evaluate_cbk = GANMonitor(column_idx_to_scaler=column_idx_to_scaler,
+#     #                           column_idx_to_ohe=column_idx_to_ohe,
+#     #                           checkpoint=checkpoint,
+#     #                           num_samples=num_samples,
+#     #                           columns=columns,
+#     #                           X_test=X_test,
+#     #                           y_test=y_test)
+#     #
+#     # tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=TF_LOGS_PATH)
+#
+#     # Start training the model
+#     c_loss_per_batch, c_loss_per_epoch, g_loss_per_batch, g_loss_per_epoch, c_acc_per_batch, c_acc_per_epoch = gan.train_gan(ds, BATCH_SIZE, N_EPOCHS)
+#
+#     # generate plots
+#     plot_critic_generator_loss(list(range(1, len(c_loss_per_batch) + 1)), c_loss_per_batch, list(range(1, len(g_loss_per_batch) + 1)), g_loss_per_batch,
+#          "critic loss", "generator loss", "batch step #", "loss", "Critic and Generator loss values per batch step")
+#     plot_critic_generator_loss(list(range(1, len(c_loss_per_epoch) + 1)), c_loss_per_epoch, list(range(1, len(g_loss_per_epoch) + 1)), g_loss_per_epoch,
+#          "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
+#
+#     plot_critic_accuracy(list(range(1, len(c_acc_per_epoch) + 1)), c_acc_per_epoch, "critic accuracy", "epoch #", "acc",
+#                          "Critic accuracy per epoch")
+#
+#     # generate plots
+#     # critic_loss = history.history['generator_loss']
+#     # generator_loss = history.history['critic_loss']
+#     # plot_critic_generator_loss(list(range(1, len(critic_loss) + 1)), critic_loss, list(range(1, len(generator_loss) + 1)), generator_loss,
+#     #      "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
 
-    # Start training the model
-    c_loss_per_batch, c_loss_per_epoch, g_loss_per_batch, g_loss_per_epoch, c_acc_per_batch, c_acc_per_epoch = gan.train_gan(ds, BATCH_SIZE, N_EPOCHS)
-
-    # generate plots
-    plot_critic_generator_loss(list(range(1, len(c_loss_per_batch) + 1)), c_loss_per_batch, list(range(1, len(g_loss_per_batch) + 1)), g_loss_per_batch,
-         "critic loss", "generator loss", "batch step #", "loss", "Critic and Generator loss values per batch step")
-    plot_critic_generator_loss(list(range(1, len(c_loss_per_epoch) + 1)), c_loss_per_epoch, list(range(1, len(g_loss_per_epoch) + 1)), g_loss_per_epoch,
-         "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
-
-    plot_critic_accuracy(list(range(1, len(c_acc_per_epoch) + 1)), c_acc_per_epoch, "critic accuracy", "epoch #", "acc",
-                         "Critic accuracy per epoch")
-
-    # generate plots
-    # critic_loss = history.history['generator_loss']
-    # generator_loss = history.history['critic_loss']
-    # plot_critic_generator_loss(list(range(1, len(critic_loss) + 1)), critic_loss, list(range(1, len(generator_loss) + 1)), generator_loss,
-    #      "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
-
-
-def train_wgan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
-               columns, X_test, y_test):
-    # Instantiate the WGAN model.
-    wgan = WGAN(input_size, columns_size, num_classes)
-
-    # configure checkpoint to save the critic and generator models during the training process
-    checkpoint = tf.train.Checkpoint(generator_optimizer=wgan.generator_optimizer,
-                                     critic_optimizer=wgan.critic_optimizer,
-                                     generator=wgan.generator,
-                                     critic=wgan.critic)
-
-    # Instantiate GANMonitor Keras callback.
-    evaluate_cbk = GANMonitor(column_idx_to_scaler=column_idx_to_scaler,
-                              column_idx_to_ohe=column_idx_to_ohe,
-                              checkpoint=checkpoint,
-                              num_samples=num_samples,
-                              columns=columns,
-                              X_test=X_test,
-                              y_test=y_test)
-
-    tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=TF_LOGS_PATH)
-
-    # Start training the model
-    history = wgan.fit(ds, batch_size=BATCH_SIZE, epochs=N_EPOCHS, callbacks=[evaluate_cbk, tensorboard_callback])
-
-    # generate plots
-    critic_loss = history.history['generator_loss']
-    generator_loss = history.history['critic_loss']
-    plot_critic_generator_loss(list(range(1, len(critic_loss) + 1)), critic_loss, list(range(1, len(generator_loss) + 1)), generator_loss,
-         "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
-
+#
+# def train_wgan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
+#                columns, X_test, y_test):
+#     # Instantiate the WGAN model.
+#     wgan = WGAN(input_size, columns_size, num_classes)
+#
+#     # configure checkpoint to save the critic and generator models during the training process
+#     checkpoint = tf.train.Checkpoint(generator_optimizer=wgan.generator_optimizer,
+#                                      critic_optimizer=wgan.critic_optimizer,
+#                                      generator=wgan.generator,
+#                                      critic=wgan.critic)
+#
+#     # Instantiate GANMonitor Keras callback.
+#     evaluate_cbk = GANMonitor(column_idx_to_scaler=column_idx_to_scaler,
+#                               column_idx_to_ohe=column_idx_to_ohe,
+#                               checkpoint=checkpoint,
+#                               num_samples=num_samples,
+#                               columns=columns,
+#                               X_test=X_test,
+#                               y_test=y_test)
+#
+#     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=TF_LOGS_PATH)
+#
+#     # Start training the model
+#     history = wgan.fit(ds, batch_size=BATCH_SIZE, epochs=N_EPOCHS, callbacks=[evaluate_cbk, tensorboard_callback])
+#
+#     # generate plots
+#     critic_loss = history.history['generator_loss']
+#     generator_loss = history.history['critic_loss']
+#     plot_critic_generator_loss(list(range(1, len(critic_loss) + 1)), critic_loss, list(range(1, len(generator_loss) + 1)), generator_loss,
+#          "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
+#
 
 def classifier_evaluation(labels_to_num_dict: dict,
                           data_path: str):
@@ -138,20 +157,31 @@ def section1():
     np.random.seed(SEED)
 
     num_classes = 2
-    diabetes_columns_size = [1] * 8
-    german_credit_columns_size = [1, 1, 1, 1, 1, 1, 1, 4, 5, 10, 5, 5, 4, 3, 4, 3, 3, 4, 2, 2]
 
     # diabetes dataset
-    diabetes_labels_to_num_dict = {'tested_positive': 1, 'tested_negative': 0}
-    X, y, column_idx_to_scaler, column_idx_to_ohe = read_and_prepare_dataset(path_to_arff_file=DIABETES_PATH,
-                                                                             labels_to_num_dict=diabetes_labels_to_num_dict,
-                                                                             decode_categorical_columns=True)
+    diabetes_labels_to_num_dict = {'tested_positive': 1 if GAN_MODE == 'cgan' else -1, 'tested_negative': 0 if GAN_MODE == 'cgan' else 1}
+    diabetes_columns_size = [1] * 8
+    diabetes_num_positive_negative_classes = (500, 268)
 
-    # # german_credit dataset
-    # german_credit_labels_to_num_dict = {'1': -1, '2': 1}
-    # X, y, column_idx_to_scaler, column_idx_to_ohe = read_and_prepare_dataset(path_to_arff_file=GERMAN_CREDIT_PATH,
-    #                                                                          labels_to_num_dict=german_credit_labels_to_num_dict,
-    #                                                                          decode_categorical_columns=True)
+    # german_credit dataset
+    german_credit_labels_to_num_dict = {'1': 0 if GAN_MODE == 'cgan' else 1, '2': 1 if GAN_MODE == 'cgan' else -1}
+    german_credit_columns_size = [1, 1, 1, 1, 1, 1, 1, 4, 5, 10, 5, 5, 4, 3, 4, 3, 3, 4, 2, 2]
+    german_credit_num_positive_negative_classes = (700, 300)
+
+    if DATASET == 'diabetes':
+        dataset_path = DIABETES_PATH
+        labels_to_num_dict = diabetes_labels_to_num_dict
+        columns_size = diabetes_columns_size
+        num_positive_negative_classes = diabetes_num_positive_negative_classes
+    else:
+        dataset_path = GERMAN_CREDIT_PATH
+        labels_to_num_dict = german_credit_labels_to_num_dict
+        columns_size = german_credit_columns_size
+        num_positive_negative_classes = german_credit_num_positive_negative_classes
+
+    X, y, column_idx_to_scaler, column_idx_to_ohe = read_and_prepare_dataset(path_to_arff_file=dataset_path,
+                                                                             labels_to_num_dict=labels_to_num_dict,
+                                                                             decode_categorical_columns=True)
 
     # convert to tf.Dataset api
     ds = convert_x_y_to_tf_dataset(X, y, batch_size=BATCH_SIZE, include_y=True)
@@ -163,13 +193,33 @@ def section1():
     num_samples = X.shape[0]
 
     # classifier evaluation
-    X_test, y_test = classifier_evaluation(diabetes_labels_to_num_dict, DIABETES_PATH)
+    X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path)
 
-    # train wgan model on german_credit dataset
-    # train_cwgan(X, y, input_size, diabetes_columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
-    #            num_samples, X.columns.tolist(), X_test, y_test)
-    train_cgan(ds, input_size, diabetes_columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
-               num_samples, X.columns.tolist(), X_test, y_test)
+    experiment_name = "mode={}_epochs={}_batch={}_c_lr={}_g_lr={}_is_conditional={}_c_steps={}_c_dropout={}_noise_size={}_seed={}".format(
+        GAN_MODE,
+        N_EPOCHS,
+        BATCH_SIZE,
+        CRITIC_LR,
+        GENERATOR_LR,
+        IS_LABEL_CONDITIONAL,
+        CRITIC_STEPS,
+        CRITIC_DROPOUT,
+        LATENT_NOISE_SIZE,
+        SEED)
+
+    experiment_dir = os.sep.join([DATASET, experiment_name])
+    if not os.path.exists(experiment_dir):
+        os.makedirs(experiment_dir)
+
+    if GAN_MODE == 'cgan':
+        positive_negative_labels = [0, 1]
+        train_cgan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
+                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir)
+    else:
+        positive_negative_labels = [1, -1]
+        train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
+                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir)
+
 
     # initialize and train GAN model for diabetes dataset
     # gan_model = WGAN_GP(input_size=input_size, columns_size=[1] * input_size, num_classes=2)
@@ -183,16 +233,6 @@ def section1():
     #
     # plot_critic_accuracy(list(range(1, len(c_acc_per_epoch) + 1)), c_acc_per_epoch, "critic accuracy", "epoch #", "acc",
     #                      "Critic accuracy per epoch")
-
-    # TODO
-    #print(wgan.generate_samples(3, 1, columns_size))
-
-    # # german_credit dataset
-    # X, y, ohe = read_and_prepare_dataset(path_to_arff_file=GERMAN_CREDIT_PATH,
-    #                                      labels_to_num_dict={'1': 1,
-    #                                                          '2': 2},
-    #                                      decode_categorical_columns=True)
-
 
 
 def section2():
