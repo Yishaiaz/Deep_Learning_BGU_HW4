@@ -113,6 +113,21 @@ def tsne(df: pd.DataFrame, non_numeric_columns: list, hue: str, filename: str = 
         plt.show()
 
 
+def model_confidence_score_distribution(model):
+    confidence_score_distribution_arr = model.model_confidence_score_distribution()
+
+    y_test_copy = model.y_test.copy()
+    y_test_copy.reset_index(drop=True, inplace=True)
+    sns.displot(pd.concat([pd.DataFrame(confidence_score_distribution_arr, columns=["prediction"]), y_test_copy], axis=1), x="prediction", hue="class")
+    plt.title("Confidence score distribution histogram with 'auto' bins")
+    plt.show()
+
+    df_describe = pd.DataFrame(confidence_score_distribution_arr)
+    print("Confidence score distribution statistics: {}".format(df_describe.describe()))
+
+    return confidence_score_distribution_arr
+
+
 def evaluate_machine_learning_efficacy(generated_samples, labels, X_test, y_test):
     model = RandomForestClassifier(random_state=SEED)
     model.fit(generated_samples, labels)

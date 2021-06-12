@@ -1,12 +1,12 @@
 from keras.models import load_model
 from table_evaluator import TableEvaluator
 from tensorflow.python.ops.numpy_ops import np_config
-import numpy as np
+
 from CGAN import CGAN
 from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from random_forest_model import *
-from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log
+from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, model_confidence_score_distribution
 
 np_config.enable_numpy_behavior()
 
@@ -208,6 +208,8 @@ def classifier_evaluation(labels_to_num_dict: dict,
     score = model.train_and_score_model()
     logger.info(f'model score on real data: {score}')
     logger.info("")
+
+    model_confidence_score_distribution(model)
 
     logger.info(f"Train LogisticRegression model on {data_path} data and evaluate")
     model = SimpleCLFForEvaluation(labels_to_num_dict, model_type='LogisticRegression')

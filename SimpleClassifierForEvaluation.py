@@ -44,6 +44,9 @@ class SimpleCLFForEvaluation:
     def score_model(self):
         return self.model.score(self.X_test, self.y_test)
 
+    def model_confidence_score_distribution(self):
+        return self.model.predict_proba(self.X_test)[:, 0]
+
     def get_feature_importance(self):  # TODO why we need featrure importance?
         if self.model_type in ['RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier']:
             return self.model.feature_importances_
