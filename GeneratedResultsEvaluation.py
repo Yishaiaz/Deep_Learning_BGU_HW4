@@ -3,6 +3,7 @@ import pandas as pd
 from SimpleClassifierForEvaluation import *
 from table_evaluator import load_data, TableEvaluator
 
+
 class GeneratedResultsEvaluator:
     def __init__(self, real_data_df: pd.DataFrame, generated_data_df: pd.DataFrame, **kwargs):
         self.real_data_df = real_data_df

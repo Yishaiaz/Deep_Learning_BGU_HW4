@@ -1,5 +1,7 @@
+from keras.models import load_model
+from table_evaluator import TableEvaluator
 from tensorflow.python.ops.numpy_ops import np_config
-
+import numpy as np
 from CGAN import CGAN
 from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
@@ -9,7 +11,35 @@ from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, 
 np_config.enable_numpy_behavior()
 
 
-def train_cgan(ds, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
+def part1_section3(experiment_dir, gan_sample_generator):
+    # load models
+    generator = load_model(f"{experiment_dir}/generator.h5")
+    critic = load_model(f"{experiment_dir}/critic.h5")
+
+    samples, generated_samples, labels_input = gan_sample_generator.generate_samples(generator, random_latent_noise=True)
+    # extract 100 random samples
+    generated_samples_reduced = np.array(generated_samples)[:100, :]
+    labels_input_reduced = labels_input[:100]
+
+    # create inverted labels for the fake samples
+    y = np.ones((100, 1))
+
+    if IS_LABEL_CONDITIONAL:
+        accuracy = critic.evaluate([generated_samples_reduced, labels_input_reduced], y)[1]
+        pred = critic.predict([generated_samples_reduced, labels_input_reduced])
+    else:
+        accuracy = critic.evaluate(generated_samples_reduced, y)[1]
+        pred = critic.predict([generated_samples_reduced, labels_input_reduced])
+
+    # extract samples that fooled the critic
+    samples_that_fooled_the_critic = np.array(samples)[np.argwhere(pred > 0.7)[:, 0].tolist()]
+    # extract samples that not fooled the critic
+    samples_that_not_fooled_the_critic = np.array(samples)[np.argwhere(pred < 0.5)[:, 0].tolist()]
+
+    return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic
+
+
+def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
                df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger):
     cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
@@ -22,14 +52,25 @@ def train_cgan(ds, input_size, columns_size, num_classes,  column_idx_to_scaler,
                                               evaluation_mode=True,
                                               positive_negative_labels=positive_negative_labels)
     d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch, max_score_for_fixed_latent_noise, \
-    max_score_for_random_latent_noise = cgan.train(ds,
-                                                   BATCH_SIZE,
-                                                   gan_sample_generator,
-                                                   X_test, y_test,
-                                                   N_EPOCHS,
-                                                   df_columns,
-                                                   experiment_dir,
-                                                   logger)
+    max_score_for_random_latent_noise, samples, generated_samples, labels = cgan.train(ds,
+                                                                                       BATCH_SIZE,
+                                                                                       gan_sample_generator,
+                                                                                       X_test, y_test,
+                                                                                       N_EPOCHS,
+                                                                                       df_columns,
+                                                                                       experiment_dir,
+                                                                                       logger)
+
+    # table evaluation
+    target_column_name = df_real.columns[-1]
+    df_fake = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1),
+                           columns=df_columns + [target_column_name])
+    table_evaluator = TableEvaluator(df_real, df_fake)
+    #table_evaluator.visual_evaluation() TODO
+    logger.info(table_evaluator.evaluate(target_col=target_column_name))
+
+    # save fake dataframe
+    df_fake.to_csv(f"{experiment_dir}/df_fake.csv", index=False)
 
     # line plots of loss
     plot_loss_history(d_loss1_epoch, d_loss2_epoch, g_loss_epoch, experiment_dir)
@@ -42,8 +83,16 @@ def train_cgan(ds, input_size, columns_size, num_classes,  column_idx_to_scaler,
         max_score_for_fixed_latent_noise,
         max_score_for_random_latent_noise))
 
+    # part 1 section 3
+    accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic = part1_section3(experiment_dir, gan_sample_generator)
 
-def train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
+    logger.info("")
+    logger.info("100 random generated samples were able to achieve {} accuracy".format(accuracy))
+    logger.info("Samples that fooled the critic: {}".format(samples_that_fooled_the_critic))
+    logger.info("Samples that not fooled the critic: {}".format(samples_that_not_fooled_the_critic))
+
+
+def train_cwgan(X, y, df_real, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
                 df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger):
     gan = CWGAN(input_size, columns_size, num_classes,
                 is_label_conditional=IS_LABEL_CONDITIONAL, positive_negative_labels=positive_negative_labels)
@@ -56,8 +105,19 @@ def train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scale
                                               num_positive_negative_classes=num_positive_negative_classes,
                                               evaluation_mode=True,
                                               positive_negative_labels=positive_negative_labels)
-    c1_hist, c2_hist, g_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
+    c1_hist, c2_hist, g_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, labels = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
         X_test, y_test, N_EPOCHS, df_columns, experiment_dir, logger)
+
+    # table evaluation
+    target_column_name = df_real.columns[-1]
+    df_fake = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1),
+                           columns=df_columns + [target_column_name])
+    table_evaluator = TableEvaluator(df_real, df_fake)
+    #table_evaluator.visual_evaluation() TODO
+    logger.info(table_evaluator.evaluate(target_col=target_column_name))
+
+    # save fake dataframe
+    df_fake.to_csv(f"{experiment_dir}/df_fake.csv", index=False)
 
     # line plots of loss
     plot_loss_history(c1_hist, c2_hist, g_hist, experiment_dir)
@@ -224,7 +284,7 @@ def section1():
 
     if GAN_MODE == 'cgan':
         positive_negative_labels = [0, 1]
-        train_cgan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
+        train_cgan(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
                    num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
     else:
         positive_negative_labels = [1, -1]

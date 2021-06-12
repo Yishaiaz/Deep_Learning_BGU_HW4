@@ -164,6 +164,7 @@ class GanSampleGenerator:
             self.positive_labels = np.full((self.num_positive_negative_classes[1],), self.positive_negative_labels[1])
             self.negative_labels = np.full((self.num_positive_negative_classes[0],), self.positive_negative_labels[0])
             self.labels_input = np.concatenate((self.positive_labels, self.negative_labels))
+            np.random.shuffle(self.labels_input)
 
     def generate_samples(self, generator, random_latent_noise: bool = False):
         if not random_latent_noise and self.evaluation_mode:

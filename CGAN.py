@@ -4,7 +4,6 @@ import numpy as np
 import tensorflow as tf
 from numpy import ones
 from numpy.random import randint
-from numpy.random import randn
 from tensorflow.keras import Model
 from tensorflow.keras.layers import Dense, Concatenate, Dropout, BatchNormalization, LeakyReLU
 from tensorflow.python.keras import Input, Sequential
@@ -166,6 +165,7 @@ class CGAN:
 
         max_score_for_fixed_latent_noise = 0.
         max_score_for_random_latent_noise = 0.
+        samples, generated_samples, generated_labels = None, None, None
 
         for epoch in range(n_epochs):
             d_loss1_epoch, d_loss2_epoch, g_loss_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch = list(), list(), list(), list(), list(), list()
@@ -217,12 +217,12 @@ class CGAN:
                           np.mean(g_loss_epoch)))
 
             # summarize performance
-            samples_fixed_latent_noise, generated_samples_fixed_latent_noise, labels = gan_sample_generator.generate_samples(self.generator)
-            samples_random_latent_noise, generated_samples_random_latent_noisee, labels = gan_sample_generator.generate_samples(self.generator, random_latent_noise=True)
+            samples_fixed_latent_noise, generated_samples_fixed_latent_noise, labels_fixed_latent_noise = gan_sample_generator.generate_samples(self.generator)
+            samples_random_latent_noise, generated_samples_random_latent_noise, labels_random_latent_noise = gan_sample_generator.generate_samples(self.generator, random_latent_noise=True)
 
             # evaluate using machine learning efficacy
-            score_for_fixed_latent_noise = evaluate_machine_learning_efficacy(generated_samples_fixed_latent_noise, labels, X_test, y_test)
-            score_for_random_latent_noise = evaluate_machine_learning_efficacy(generated_samples_random_latent_noisee, labels, X_test, y_test)
+            score_for_fixed_latent_noise = evaluate_machine_learning_efficacy(generated_samples_fixed_latent_noise, labels_fixed_latent_noise, X_test, y_test)
+            score_for_random_latent_noise = evaluate_machine_learning_efficacy(generated_samples_random_latent_noise, labels_random_latent_noise, X_test, y_test)
 
             logger.info("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
                                                                                                             score_for_fixed_latent_noise,
@@ -230,16 +230,20 @@ class CGAN:
 
             if score_for_fixed_latent_noise > max_score_for_fixed_latent_noise:
                 max_score_for_fixed_latent_noise = score_for_fixed_latent_noise
+                samples = samples_fixed_latent_noise
+                generated_samples = generated_samples_fixed_latent_noise
+                generated_labels = labels_fixed_latent_noise
 
                 # save models
                 self.generator.save(f"{experiment_dir}/generator.h5")
-                self.discriminator.save(f"{experiment_dir}/discriminator.h5")
+                self.discriminator.save(f"{experiment_dir}/critic.h5")
                 self.gan.save(f"{experiment_dir}/gan.h5")
 
                 # evaluate using tsne
-                evaluate_using_tsne(samples_fixed_latent_noise, labels, df_columns, epoch, experiment_dir)
+                evaluate_using_tsne(samples_fixed_latent_noise, generated_labels, df_columns, epoch, experiment_dir)
 
             if score_for_random_latent_noise > max_score_for_random_latent_noise:
                 max_score_for_random_latent_noise = score_for_random_latent_noise
 
-        return d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch,  d_acc2_epoch, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise
+        return d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch,  d_acc2_epoch,\
+               max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, generated_labels
