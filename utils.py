@@ -145,19 +145,22 @@ def evaluate_using_tsne(samples, labels, df_columns, index, dir):
 def draw_boxplot(samples:np.array, generated_samples: np.array, path_to_save_fig: str):
     def draw_plot(ax, data, offset,edge_color, fill_color, label: str):
         pos = np.arange(data.shape[1])+offset
-        bp = ax.boxplot(data, positions= pos, widths=0.3, patch_artist=True)#, label=label)
+        bp = ax.boxplot(data, positions= pos, widths=0.2, patch_artist=True)#, label=label)
         for element in ['boxes', 'whiskers', 'fliers', 'medians', 'caps']:
             plt.setp(bp[element], color=edge_color)
         for patch in bp['boxes']:
             patch.set(facecolor=fill_color)
         return bp
     fig, ax = plt.subplots()
-    bp1 = draw_plot(ax, samples, -0.2, "red", "white", label='Real')
-    bp2 = draw_plot(ax, generated_samples, +0.2, "blue", "white", label='Generated')
+    bp1 = draw_plot(ax, samples, -0.1, "red", "white", label='Real')
+    bp2 = draw_plot(ax, generated_samples, +0.1, "blue", "white", label='Generated')
     plt.xticks(ticks=np.arange(samples.shape[1]), labels=[f'F{i+1}' for i in np.arange(samples.shape[1])])
     plt.legend([bp1["boxes"][0], bp2["boxes"][0]], ['Real', 'Generated'], loc='upper right')
     plt.tight_layout()
     plt.savefig(path_to_save_fig, dpi=200)
+
+
+# def real_to_generated_distance(real: np.array, generated: np.asarray):
 
 
 def generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real, num_of_samples):
@@ -169,7 +172,7 @@ def generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real, nu
     generated_samples_reduced = np.array(generated_samples)[:num_of_samples, :]
 
     path_to_box_plot = os.sep.join([experiment_dir, 'boxplot_save.png'])
-    draw_boxplot(samples=df_real.values[:num_of_samples, :],
+    draw_boxplot(samples=df_real.values[:num_of_samples, :-1],
                  generated_samples=np.asarray(generated_samples_reduced),
                  path_to_save_fig=path_to_box_plot)
 
