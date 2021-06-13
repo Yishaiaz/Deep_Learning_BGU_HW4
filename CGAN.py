@@ -167,6 +167,8 @@ class CGAN:
         max_score_for_random_latent_noise = 0.
         samples, generated_samples, generated_labels = None, None, None
 
+        d_loss1_hist, d_loss2_hist, g_loss_hist, g_loss_hist, d_acc1_hist, d_acc2_hist = list(), list(), list(), list(), list(), list()
+
         for epoch in range(n_epochs):
             d_loss1_epoch, d_loss2_epoch, g_loss_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch = list(), list(), list(), list(), list(), list()
 
@@ -207,14 +209,21 @@ class CGAN:
                 d_acc1_epoch.append(d_acc1)
                 d_acc2_epoch.append(d_acc2)
 
+            # store loss & accuracy
+            g_loss_hist.append(np.mean(g_loss_epoch))
+            d_loss1_hist.append(np.mean(d_loss1_epoch))
+            d_loss2_hist.append(np.mean(d_loss2_epoch))
+            d_acc1_hist.append(np.mean(d_acc1_epoch))
+            d_acc2_hist.append(np.mean(d_acc2_epoch))
+
             # logging
             logger.info("epoch {} discriminator - d_loss1: {} - d_loss2: {} - d_acc1: {} - d_acc2: {}, generator - g_loss: {}"
                   .format(epoch,
-                          np.mean(d_loss1_epoch),
-                          np.mean(d_loss2_epoch),
-                          np.mean(d_acc1_epoch),
-                          np.mean(d_acc2_epoch),
-                          np.mean(g_loss_epoch)))
+                          d_loss1_hist[-1],
+                          d_loss2_hist[-1],
+                          d_acc1_hist[-1],
+                          d_acc2_hist[-1],
+                          g_loss_hist[-1]))
 
             # summarize performance
             samples_fixed_latent_noise, generated_samples_fixed_latent_noise, labels_fixed_latent_noise = gan_sample_generator.generate_samples(self.generator)
@@ -245,5 +254,5 @@ class CGAN:
             if score_for_random_latent_noise > max_score_for_random_latent_noise:
                 max_score_for_random_latent_noise = score_for_random_latent_noise
 
-        return d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch,  d_acc2_epoch,\
+        return d_loss1_hist, d_loss2_hist, g_loss_hist, d_acc1_hist,  d_acc2_hist,\
                max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, generated_labels
