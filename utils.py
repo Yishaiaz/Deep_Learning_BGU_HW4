@@ -162,8 +162,9 @@ def draw_boxplot(samples:np.array, generated_samples: np.array, path_to_save_fig
 
 
 def real_to_generated_distance(real_df: pd.DataFrame, fake_df: pd.DataFrame, categorical_columns):
-    table_evaluator.metrics.column_correlations(real_df, fake_df, categorical_columns)
-
+    column_correlation = table_evaluator.metrics.column_correlations(real_df, fake_df, categorical_columns)
+    euclidean_distance = table_evaluator.metrics.euclidean_distance(real_df.values, fake_df.values)
+    return column_correlation, euclidean_distance
 
 def generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real, num_of_samples):
     generator = load_model(f"{experiment_dir}/generator.h5")
