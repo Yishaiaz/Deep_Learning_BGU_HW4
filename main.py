@@ -1,3 +1,4 @@
+import numpy as np
 from keras.models import load_model
 from table_evaluator import TableEvaluator
 from tensorflow.python.ops.numpy_ops import np_config
@@ -6,7 +7,7 @@ from CGAN import CGAN
 from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from random_forest_model import *
-from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, model_confidence_score_distribution
+from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, model_confidence_score_distribution, draw_boxplot
 
 np_config.enable_numpy_behavior()
 
@@ -35,6 +36,8 @@ def part1_section3(experiment_dir, gan_sample_generator):
     samples_that_fooled_the_critic = np.array(samples)[np.argwhere(pred > 0.7)[:, 0].tolist()]
     # extract samples that not fooled the critic
     samples_that_not_fooled_the_critic = np.array(samples)[np.argwhere(pred < 0.5)[:, 0].tolist()]
+
+    draw_boxplot(samples=np.asarray(samples)[:100], generated_samples=np.asarray(generated_samples_reduced), path_to_save_fig='boxplot_save.png')
 
     return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic
 

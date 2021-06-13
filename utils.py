@@ -141,6 +141,25 @@ def evaluate_using_tsne(samples, labels, df_columns, index, dir):
     tsne(df, categorical_columns, hue='class', filename=f'{dir}/{index}_tsne', save_figure=True)
 
 
+def draw_boxplot(samples:np.array, generated_samples: np.array, path_to_save_fig: str):
+    def draw_plot(ax, data, offset,edge_color, fill_color, label: str):
+        pos = np.arange(data.shape[1])+offset
+        bp = ax.boxplot(data, positions= pos, widths=0.3, patch_artist=True)#, label=label)
+        for element in ['boxes', 'whiskers', 'fliers', 'medians', 'caps']:
+            plt.setp(bp[element], color=edge_color)
+        for patch in bp['boxes']:
+            patch.set(facecolor=fill_color)
+
+    fig, ax = plt.subplots()
+    draw_plot(ax, samples, -0.2, "red", "white", label='Real')
+    draw_plot(ax, generated_samples, +0.2, "blue", "white", label='Generated')
+    plt.xticks(np.arange(samples.shape[1]))
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig(path_to_save_fig, dpi=200)
+
+
+
 class GanSampleGenerator:
     def __init__(self,
                  latent_noise_size: int,
