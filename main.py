@@ -217,7 +217,7 @@ def classifier_evaluation(labels_to_num_dict: dict,
                           data_path: str,
                           logger):
     logger.info(f"Train RandomForestClassifier model on {data_path} data and evaluate")
-    model = SimpleCLFForEvaluation(labels_to_num_dict)
+    model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=data_path)
     score = model.train_and_score_model()
     logger.info(f'model score on real data: {score}')
     logger.info("")
@@ -225,7 +225,7 @@ def classifier_evaluation(labels_to_num_dict: dict,
     model_confidence_score_distribution(model)
 
     logger.info(f"Train LogisticRegression model on {data_path} data and evaluate")
-    model = SimpleCLFForEvaluation(labels_to_num_dict, model_type='LogisticRegression')
+    model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=data_path, model_type='LogisticRegression')
     score = model.train_and_score_model()
     logger.info(f'model score on real data: {score}')
     logger.info("")
@@ -322,8 +322,77 @@ def section1():
 
 
 def section2():
-    create_and_train_random_forest(DIABETES_PATH)
-    create_and_train_random_forest(GERMAN_CREDIT_PATH)
+    tf.random.set_seed(SEED)
+    np.random.seed(SEED)
+
+    num_classes = 2
+
+    # diabetes dataset
+    diabetes_labels_to_num_dict = {'tested_positive': 1,'tested_negative': 0}
+    diabetes_columns_size = [1] * 8
+    diabetes_num_positive_negative_classes = (500, 268)
+
+    # german_credit dataset
+    german_credit_labels_to_num_dict = {'1': 0, '2': 1}
+    german_credit_columns_size = [1, 1, 1, 1, 1, 1, 1, 4, 5, 10, 5, 5, 4, 3, 4, 3, 3, 4, 2, 2]
+    german_credit_num_positive_negative_classes = (700, 300)
+
+    if DATASET == 'diabetes':
+        dataset_path = DIABETES_PATH
+        labels_to_num_dict = diabetes_labels_to_num_dict
+        columns_size = diabetes_columns_size
+        num_positive_negative_classes = diabetes_num_positive_negative_classes
+    else:
+        dataset_path = GERMAN_CREDIT_PATH
+        labels_to_num_dict = german_credit_labels_to_num_dict
+        columns_size = german_credit_columns_size
+        num_positive_negative_classes = german_credit_num_positive_negative_classes
+
+    X, y, column_idx_to_scaler, column_idx_to_ohe = read_and_prepare_dataset(path_to_arff_file=dataset_path,
+                                                                             labels_to_num_dict=labels_to_num_dict,
+                                                                             decode_categorical_columns=True)
+
+    # convert to tf.Dataset api
+    ds = convert_x_y_to_tf_dataset(X, y, batch_size=BATCH_SIZE, include_y=True)
+
+    # extract input size
+    input_size = X.shape[1]
+
+    # extract number of training samples
+    num_samples = X.shape[0]
+
+    experiment_name = "mode={}_epochs={}_batch={}_c_lr={}_g_lr={}_is_conditional={}_c_steps={}_c_dropout={}_noise_size={}_seed={}".format(
+        "gan_with_twist",
+        N_EPOCHS,
+        BATCH_SIZE,
+        CRITIC_LR,
+        GENERATOR_LR,
+        IS_LABEL_CONDITIONAL,
+        CRITIC_STEPS,
+        CRITIC_DROPOUT,
+        LATENT_NOISE_SIZE,
+        SEED)
+
+    experiment_dir = os.sep.join([DATASET, experiment_name])
+    if not os.path.exists(experiment_dir):
+        os.makedirs(experiment_dir)
+
+    log_filename = os.sep.join([experiment_dir, f'{experiment_name}.txt'])
+
+    logger = log(".", log_filename)
+    logger.info("#################################################################")
+
+    # classifier evaluation
+    model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=dataset_path)
+    model.train_and_score_model()
+
+    X_test, y_test = model.X_test, model.y_test
+
+    positive_negative_labels = [0, 1]
+    train_gan_with_twist(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler,
+               column_idx_to_ohe,
+               num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes,
+               positive_negative_labels, experiment_dir, logger)
 
 
 if __name__ == '__main__':

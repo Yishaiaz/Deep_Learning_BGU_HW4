@@ -167,10 +167,10 @@ class CGAN:
         max_score_for_random_latent_noise = 0.
         samples, generated_samples, generated_labels = None, None, None
 
-        d_loss1_hist, d_loss2_hist, g_loss_hist, g_loss_hist, d_acc1_hist, d_acc2_hist = list(), list(), list(), list(), list(), list()
+        d_loss1_hist, d_loss2_hist, g_loss_hist, d_acc1_hist, d_acc2_hist = list(), list(), list(), list(), list()
 
         for epoch in range(n_epochs):
-            d_loss1_epoch, d_loss2_epoch, g_loss_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch = list(), list(), list(), list(), list(), list()
+            d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch = list(), list(), list(), list(), list()
 
             # enumerate batches over the training set
             for X_batch, y_batch in dataset:
