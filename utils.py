@@ -13,6 +13,7 @@ from keras.models import load_model
 
 from global_vars import SEED
 from preprocessing_utils import gather_numeric_and_categorical_columns
+import table_evaluator
 
 
 def log(path, file):
@@ -160,7 +161,8 @@ def draw_boxplot(samples:np.array, generated_samples: np.array, path_to_save_fig
     plt.savefig(path_to_save_fig, dpi=200)
 
 
-# def real_to_generated_distance(real: np.array, generated: np.asarray):
+def real_to_generated_distance(real_df: pd.DataFrame, fake_df: pd.DataFrame, categorical_columns):
+    table_evaluator.metrics.column_correlations(real_df, fake_df, categorical_columns)
 
 
 def generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real, num_of_samples):
@@ -169,11 +171,11 @@ def generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real, nu
     samples, generated_samples, labels_input = gan_sample_generator.generate_samples(generator,
                                                                                      random_latent_noise=True)
     # extract N random samples
-    generated_samples_reduced = np.array(generated_samples)[:num_of_samples, :]
+    samples_reduced = np.array(samples)[:num_of_samples, :]
 
     path_to_box_plot = os.sep.join([experiment_dir, 'boxplot_save.png'])
     draw_boxplot(samples=df_real.values[:num_of_samples, :-1],
-                 generated_samples=np.asarray(generated_samples_reduced),
+                 generated_samples=np.asarray(samples_reduced),
                  path_to_save_fig=path_to_box_plot)
 
 

@@ -8,7 +8,8 @@ from CGAN import CGAN
 from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from random_forest_model import *
-from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, model_confidence_score_distribution, generate_and_draw_boxplots
+from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, \
+    model_confidence_score_distribution, generate_and_draw_boxplots, real_to_generated_distance
 
 np_config.enable_numpy_behavior()
 
@@ -40,6 +41,10 @@ def part1_section3(experiment_dir, gan_sample_generator, real_df: pd.DataFrame):
 
     # boxplots
     generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real=real_df, num_of_samples=100)
+
+    # distances between real and fake
+    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(real_df)
+    real_to_generated_distance(real_df=real_df.iloc[:, :-1], fake_df=pd.DataFrame(data=samples, columns=real_df.columns.values[:-1]), categorical_columns=categorical_columns)
 
     return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic
 
