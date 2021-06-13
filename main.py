@@ -44,9 +44,9 @@ def part1_section3(experiment_dir, gan_sample_generator, real_df: pd.DataFrame):
 
     # distances between real and fake
     numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(real_df)
-    real_to_generated_distance(real_df=real_df.iloc[:, :-1], fake_df=pd.DataFrame(data=samples, columns=real_df.columns.values[:-1]), categorical_columns=categorical_columns)
+    column_correlation, euclidean_distance = real_to_generated_distance(real_df=real_df.iloc[:, :-1], fake_df=pd.DataFrame(data=samples, columns=real_df.columns.values[:-1]), categorical_columns=categorical_columns)
 
-    return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic
+    return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, column_correlation, euclidean_distance
 
 
 def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
@@ -94,14 +94,15 @@ def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_t
         max_score_for_random_latent_noise))
 
     # part 1 section 3
-    accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic = part1_section3(experiment_dir,
-                                                                                                  gan_sample_generator,
-                                                                                                  df_real)
+    accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, \
+    column_correlation, euclidean_distance = part1_section3(experiment_dir, gan_sample_generator, df_real)
 
     logger.info("")
     logger.info("100 random generated samples were able to achieve {} accuracy".format(accuracy))
     logger.info("Samples that fooled the critic: {}".format(samples_that_fooled_the_critic))
     logger.info("Samples that not fooled the critic: {}".format(samples_that_not_fooled_the_critic))
+    logger.info("Column correlation between fake and real data: {}".format(column_correlation))
+    logger.info("Euclidean distance between fake and real data: {}".format(euclidean_distance))
 
 
 def train_cwgan(X, y, df_real, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
