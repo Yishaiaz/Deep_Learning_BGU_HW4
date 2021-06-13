@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 from keras.models import load_model
 from table_evaluator import TableEvaluator
 from tensorflow.python.ops.numpy_ops import np_config
@@ -7,12 +8,12 @@ from CGAN import CGAN
 from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from random_forest_model import *
-from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, model_confidence_score_distribution, draw_boxplot
+from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, model_confidence_score_distribution, generate_and_draw_boxplots
 
 np_config.enable_numpy_behavior()
 
 
-def part1_section3(experiment_dir, gan_sample_generator):
+def part1_section3(experiment_dir, gan_sample_generator, real_df: pd.DataFrame):
     # load models
     generator = load_model(f"{experiment_dir}/generator.h5")
     critic = load_model(f"{experiment_dir}/critic.h5")
@@ -37,7 +38,8 @@ def part1_section3(experiment_dir, gan_sample_generator):
     # extract samples that not fooled the critic
     samples_that_not_fooled_the_critic = np.array(samples)[np.argwhere(pred < 0.5)[:, 0].tolist()]
 
-    draw_boxplot(samples=np.asarray(samples)[:100], generated_samples=np.asarray(generated_samples_reduced), path_to_save_fig='boxplot_save.png')
+    # boxplots
+    generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real=real_df, num_of_samples=100)
 
     return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic
 
@@ -87,7 +89,9 @@ def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_t
         max_score_for_random_latent_noise))
 
     # part 1 section 3
-    accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic = part1_section3(experiment_dir, gan_sample_generator)
+    accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic = part1_section3(experiment_dir,
+                                                                                                  gan_sample_generator,
+                                                                                                  df_real)
 
     logger.info("")
     logger.info("100 random generated samples were able to achieve {} accuracy".format(accuracy))

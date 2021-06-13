@@ -9,6 +9,7 @@ import seaborn as sns
 import tensorflow as tf
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.manifold import TSNE
+from keras.models import load_model
 
 from global_vars import SEED
 from preprocessing_utils import gather_numeric_and_categorical_columns
@@ -149,15 +150,28 @@ def draw_boxplot(samples:np.array, generated_samples: np.array, path_to_save_fig
             plt.setp(bp[element], color=edge_color)
         for patch in bp['boxes']:
             patch.set(facecolor=fill_color)
-
+        return bp
     fig, ax = plt.subplots()
-    draw_plot(ax, samples, -0.2, "red", "white", label='Real')
-    draw_plot(ax, generated_samples, +0.2, "blue", "white", label='Generated')
-    plt.xticks(np.arange(samples.shape[1]))
-    plt.legend()
+    bp1 = draw_plot(ax, samples, -0.2, "red", "white", label='Real')
+    bp2 = draw_plot(ax, generated_samples, +0.2, "blue", "white", label='Generated')
+    plt.xticks(ticks=np.arange(samples.shape[1]), labels=[f'F{i+1}' for i in np.arange(samples.shape[1])])
+    plt.legend([bp1["boxes"][0], bp2["boxes"][0]], ['Real', 'Generated'], loc='upper right')
     plt.tight_layout()
     plt.savefig(path_to_save_fig, dpi=200)
 
+
+def generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real, num_of_samples):
+    generator = load_model(f"{experiment_dir}/generator.h5")
+
+    samples, generated_samples, labels_input = gan_sample_generator.generate_samples(generator,
+                                                                                     random_latent_noise=True)
+    # extract N random samples
+    generated_samples_reduced = np.array(generated_samples)[:num_of_samples, :]
+
+    path_to_box_plot = os.sep.join([experiment_dir, 'boxplot_save.png'])
+    draw_boxplot(samples=df_real.values[:num_of_samples, :],
+                 generated_samples=np.asarray(generated_samples_reduced),
+                 path_to_save_fig=path_to_box_plot)
 
 
 class GanSampleGenerator:
