@@ -51,3 +51,7 @@ CONSIDER:
 1. different learning rate for discriminator and generator.
 2. Packing: the discriminator considers multiple samples (either fake or real or mix) each step - to avoid mode collapse.
 3. add dropout to discriminator.
+
+
+https://keras.io/examples/generative/wgan_gp/
+https://machinelearningmastery.com/how-to-code-a-wasserstein-generative-adversarial-network-wgan-from-scratch/
