@@ -140,6 +140,64 @@ def train_cwgan(X, y, df_real, input_size, columns_size, num_classes, column_idx
         max_score_for_fixed_latent_noise,
         max_score_for_random_latent_noise))
 
+
+
+def train_gan_with_twist(ds, df_real, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
+               df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger):
+    pass
+    # cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL)
+    # gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
+    #                                           column_idx_to_scaler,
+    #                                           column_idx_to_ohe,
+    #                                           columns_size,
+    #                                           num_samples,
+    #                                           is_label_conditional=IS_LABEL_CONDITIONAL,
+    #                                           num_positive_negative_classes=num_positive_negative_classes,
+    #                                           evaluation_mode=True,
+    #                                           positive_negative_labels=positive_negative_labels)
+    # d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch, max_score_for_fixed_latent_noise, \
+    # max_score_for_random_latent_noise, samples, generated_samples, labels = cgan.train(ds,
+    #                                                                                    BATCH_SIZE,
+    #                                                                                    gan_sample_generator,
+    #                                                                                    X_test, y_test,
+    #                                                                                    N_EPOCHS,
+    #                                                                                    df_columns,
+    #                                                                                    experiment_dir,
+    #                                                                                    logger)
+    #
+    # # table evaluation
+    # target_column_name = df_real.columns[-1]
+    # df_fake = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1),
+    #                        columns=df_columns + [target_column_name])
+    # table_evaluator = TableEvaluator(df_real, df_fake)
+    # #table_evaluator.visual_evaluation() TODO
+    # logger.info(table_evaluator.evaluate(target_col=target_column_name))
+    #
+    # # save fake dataframe
+    # df_fake.to_csv(f"{experiment_dir}/df_fake.csv", index=False)
+    #
+    # # line plots of loss
+    # plot_loss_history(d_loss1_epoch, d_loss2_epoch, g_loss_epoch, experiment_dir)
+    #
+    # # line plots of accuracy
+    # plot_accuracy_history(d_acc1_epoch, d_acc2_epoch, experiment_dir)
+    #
+    # logger.info("")
+    # logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
+    #     max_score_for_fixed_latent_noise,
+    #     max_score_for_random_latent_noise))
+    #
+    # # part 1 section 3
+    # accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, \
+    # column_correlation, euclidean_distance = part1_section3(experiment_dir, gan_sample_generator, df_real)
+    #
+    # logger.info("")
+    # logger.info("100 random generated samples were able to achieve {} accuracy".format(accuracy))
+    # logger.info("Samples that fooled the critic: {}".format(samples_that_fooled_the_critic))
+    # logger.info("Samples that not fooled the critic: {}".format(samples_that_not_fooled_the_critic))
+    # logger.info("Column correlation between fake and real data: {}".format(column_correlation))
+    # logger.info("Euclidean distance between fake and real data: {}".format(euclidean_distance))
+
 # def train_gan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
 #                columns, X_test, y_test):
 #     # Instantiate the WGAN model.
@@ -233,19 +291,19 @@ def classifier_evaluation(labels_to_num_dict: dict,
     return model.X_test, model.y_test
 
 
-def section1():
+def main():
     tf.random.set_seed(SEED)
     np.random.seed(SEED)
 
     num_classes = 2
 
     # diabetes dataset
-    diabetes_labels_to_num_dict = {'tested_positive': 1 if GAN_MODE == 'cgan' else -1, 'tested_negative': 0 if GAN_MODE == 'cgan' else 1}
+    diabetes_labels_to_num_dict = {'tested_positive': 1 if GAN_MODE == 'cgan' or GAN_MODE == 'gan_with_twist' else -1, 'tested_negative': 0 if GAN_MODE == 'cgan' else 1}
     diabetes_columns_size = [1] * 8
     diabetes_num_positive_negative_classes = (500, 268)
 
     # german_credit dataset
-    german_credit_labels_to_num_dict = {'1': 0 if GAN_MODE == 'cgan' else 1, '2': 1 if GAN_MODE == 'cgan' else -1}
+    german_credit_labels_to_num_dict = {'1': 0 if GAN_MODE == 'cgan' or GAN_MODE == 'gan_with_twist' else 1, '2': 1 if GAN_MODE == 'cgan' else -1}
     german_credit_columns_size = [1, 1, 1, 1, 1, 1, 1, 4, 5, 10, 5, 5, 4, 3, 4, 3, 3, 4, 2, 2]
     german_credit_num_positive_negative_classes = (700, 300)
 
@@ -285,7 +343,7 @@ def section1():
         LATENT_NOISE_SIZE,
         SEED)
 
-    experiment_dir = os.sep.join([DATASET, experiment_name])
+    experiment_dir = os.sep.join([DATASET, SECTION, experiment_name])
     if not os.path.exists(experiment_dir):
         os.makedirs(experiment_dir)
 
@@ -295,108 +353,31 @@ def section1():
     logger.info("#################################################################")
 
     # classifier evaluation
-    X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path, logger)
+    if GAN_MODE == 'gan_with_twist':
+        model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=dataset_path)
+        model.train_and_score_model()
+        X_test, y_test = model.X_test, model.y_test
+    else:
+        X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path, logger)
 
     if GAN_MODE == 'cgan':
         positive_negative_labels = [0, 1]
         train_cgan(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
                    num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
-    else:
+    elif GAN_MODE == 'cwgan':
         positive_negative_labels = [1, -1]
         train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
                    num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
-
-
-    # initialize and train GAN model for diabetes dataset
-    # gan_model = WGAN_GP(input_size=input_size, columns_size=[1] * input_size, num_classes=2)
-    # c_loss_per_batch, c_loss_per_epoch, g_loss_per_batch, g_loss_per_epoch, c_acc_per_batch, c_acc_per_epoch = gan_model.train_gan(ds, BATCH_SIZE, N_EPOCHS)
-    #
-    # # generate plots
-    # plot_critic_generator_loss(list(range(1, len(c_loss_per_batch) + 1)), c_loss_per_batch, list(range(1, len(g_loss_per_batch) + 1)), g_loss_per_batch,
-    #      "critic loss", "generator loss", "batch step #", "loss", "Critic and Generator loss values per batch step")
-    # plot_critic_generator_loss(list(range(1, len(c_loss_per_epoch) + 1)), c_loss_per_epoch, list(range(1, len(g_loss_per_epoch) + 1)), g_loss_per_epoch,
-    #      "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
-    #
-    # plot_critic_accuracy(list(range(1, len(c_acc_per_epoch) + 1)), c_acc_per_epoch, "critic accuracy", "epoch #", "acc",
-    #                      "Critic accuracy per epoch")
-
-
-def section2():
-    tf.random.set_seed(SEED)
-    np.random.seed(SEED)
-
-    num_classes = 2
-
-    # diabetes dataset
-    diabetes_labels_to_num_dict = {'tested_positive': 1,'tested_negative': 0}
-    diabetes_columns_size = [1] * 8
-    diabetes_num_positive_negative_classes = (500, 268)
-
-    # german_credit dataset
-    german_credit_labels_to_num_dict = {'1': 0, '2': 1}
-    german_credit_columns_size = [1, 1, 1, 1, 1, 1, 1, 4, 5, 10, 5, 5, 4, 3, 4, 3, 3, 4, 2, 2]
-    german_credit_num_positive_negative_classes = (700, 300)
-
-    if DATASET == 'diabetes':
-        dataset_path = DIABETES_PATH
-        labels_to_num_dict = diabetes_labels_to_num_dict
-        columns_size = diabetes_columns_size
-        num_positive_negative_classes = diabetes_num_positive_negative_classes
     else:
-        dataset_path = GERMAN_CREDIT_PATH
-        labels_to_num_dict = german_credit_labels_to_num_dict
-        columns_size = german_credit_columns_size
-        num_positive_negative_classes = german_credit_num_positive_negative_classes
-
-    X, y, column_idx_to_scaler, column_idx_to_ohe = read_and_prepare_dataset(path_to_arff_file=dataset_path,
-                                                                             labels_to_num_dict=labels_to_num_dict,
-                                                                             decode_categorical_columns=True)
-
-    # convert to tf.Dataset api
-    ds = convert_x_y_to_tf_dataset(X, y, batch_size=BATCH_SIZE, include_y=True)
-
-    # extract input size
-    input_size = X.shape[1]
-
-    # extract number of training samples
-    num_samples = X.shape[0]
-
-    experiment_name = "mode={}_epochs={}_batch={}_c_lr={}_g_lr={}_is_conditional={}_c_steps={}_c_dropout={}_noise_size={}_seed={}".format(
-        "gan_with_twist",
-        N_EPOCHS,
-        BATCH_SIZE,
-        CRITIC_LR,
-        GENERATOR_LR,
-        IS_LABEL_CONDITIONAL,
-        CRITIC_STEPS,
-        CRITIC_DROPOUT,
-        LATENT_NOISE_SIZE,
-        SEED)
-
-    experiment_dir = os.sep.join([DATASET, experiment_name])
-    if not os.path.exists(experiment_dir):
-        os.makedirs(experiment_dir)
-
-    log_filename = os.sep.join([experiment_dir, f'{experiment_name}.txt'])
-
-    logger = log(".", log_filename)
-    logger.info("#################################################################")
-
-    # classifier evaluation
-    model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=dataset_path)
-    model.train_and_score_model()
-
-    X_test, y_test = model.X_test, model.y_test
-
-    positive_negative_labels = [0, 1]
-    train_gan_with_twist(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler,
+        positive_negative_labels = [0, 1]
+        train_gan_with_twist(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler,
                column_idx_to_ohe,
                num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes,
                positive_negative_labels, experiment_dir, logger)
 
 
 if __name__ == '__main__':
-    section1()
+    main()
     # input_size = list(ds.take(1).as_numpy_iterator())[0].shape[0]
     # generator = Generator(input_size=input_size)
     # discriminator = Discriminator(input_size=input_size)

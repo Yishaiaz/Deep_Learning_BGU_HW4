@@ -16,7 +16,8 @@ CHECKPOINT_PREFIX = os.path.join(CHECKPOINT_DIR, "ckpt")  # TODO
 
 OVERWRITE_RFC_FILE = False
 DATASET = 'diabetes'
-GAN_MODE = 'cgan'
+GAN_MODE = 'gan_with_twist'
+SECTION = "section1"
 
 SEED = 42
 BATCH_SIZE = 128
