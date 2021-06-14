@@ -366,7 +366,7 @@ def main():
                    num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
     elif GAN_MODE == 'cwgan':
         positive_negative_labels = [1, -1]
-        train_cwgan(X, y, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
+        train_cwgan(X, y, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
                    num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
     else:
         positive_negative_labels = [0, 1]
