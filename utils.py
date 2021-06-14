@@ -120,6 +120,8 @@ def model_confidence_score_distribution(model):
 
     y_test_copy = model.y_test.copy()
     y_test_copy.reset_index(drop=True, inplace=True)
+    confidence_score_distribution_arr = confidence_score_distribution_arr[
+        np.arange(0, len(confidence_score_distribution_arr), 1)[:, np.newaxis], y_test_copy.values]
     sns.displot(pd.concat([pd.DataFrame(confidence_score_distribution_arr, columns=["prediction"]), y_test_copy], axis=1), x="prediction", hue="class")
     plt.title("Confidence score distribution histogram with 'auto' bins")
     plt.show()
@@ -143,7 +145,7 @@ def evaluate_using_tsne(samples, labels, df_columns, index, dir):
     tsne(df, categorical_columns, hue='class', filename=f'{dir}/{index}_tsne', save_figure=True)
 
 
-def draw_boxplot(samples:np.array, generated_samples: np.array, path_to_save_fig: str):
+def draw_boxplot(real_samples: np.array, generated_samples: np.array, path_to_save_fig: str):
     def draw_plot(ax, data, offset,edge_color, fill_color, label: str):
         pos = np.arange(data.shape[1])+offset
         bp = ax.boxplot(data, positions= pos, widths=0.2, patch_artist=True)#, label=label)
@@ -153,9 +155,9 @@ def draw_boxplot(samples:np.array, generated_samples: np.array, path_to_save_fig
             patch.set(facecolor=fill_color)
         return bp
     fig, ax = plt.subplots()
-    bp1 = draw_plot(ax, samples, -0.1, "red", "white", label='Real')
+    bp1 = draw_plot(ax, real_samples, -0.1, "red", "white", label='Real')
     bp2 = draw_plot(ax, generated_samples, +0.1, "blue", "white", label='Generated')
-    plt.xticks(ticks=np.arange(samples.shape[1]), labels=[f'F{i+1}' for i in np.arange(samples.shape[1])])
+    plt.xticks(ticks=np.arange(real_samples.shape[1]), labels=[f'F{i + 1}' for i in np.arange(real_samples.shape[1])])
     plt.legend([bp1["boxes"][0], bp2["boxes"][0]], ['Real', 'Generated'], loc='upper right')
     plt.tight_layout()
     plt.savefig(path_to_save_fig, dpi=200)
@@ -176,9 +178,16 @@ def generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real, nu
     samples_reduced = np.array(samples)[:num_of_samples, :]
 
     path_to_box_plot = os.sep.join([experiment_dir, 'boxplot_save.png'])
-    draw_boxplot(samples=df_real.values[:num_of_samples, :-1],
+    draw_boxplot(real_samples=df_real.values[:num_of_samples, :-1],
                  generated_samples=np.asarray(samples_reduced),
                  path_to_save_fig=path_to_box_plot)
+
+
+def invert_labels_to_num_dict(labels_to_num_dict: dict):
+    inverse_dict = {}
+    for key, val in labels_to_num_dict.items():
+        inverse_dict[val] = key
+    return inverse_dict
 
 
 class GanSampleGenerator:

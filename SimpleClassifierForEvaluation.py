@@ -42,10 +42,16 @@ class SimpleCLFForEvaluation:
         self.model_trained = True
 
     def score_model(self):
+        if not self.model_trained:
+            raise RuntimeWarning('Model not yet trained, use the train_model method or the train_and_score method directly')
         return self.model.score(self.X_test, self.y_test)
 
-    def model_confidence_score_distribution(self):
-        return self.model.predict_proba(self.X_test)[:, 0]
+    def model_confidence_score_distribution(self, to_predict: np.array = None):
+        if not self.model_trained:
+            raise RuntimeWarning('Model not yet trained, use the train_model method or the train_and_score method directly')
+        if to_predict is None:
+            to_predict = self.X_test
+        return self.model.predict_proba(to_predict)
 
     def get_feature_importance(self):  # TODO why we need featrure importance?
         if self.model_type in ['RandomForestClassifier, RandomForestRegressor, GradientBoostingClassifier']:
