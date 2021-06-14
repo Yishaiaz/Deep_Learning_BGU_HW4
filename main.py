@@ -214,7 +214,17 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     plt.legend()
     fig_path = os.sep.join([experiment_dir, 'mean_absolute_error_of_confidences.png'])
     plt.savefig(fig_path)
-        #todo complete code here
+
+    fig, ax = plt.subplots()
+    ax.hist(probas_dist[:, 0], edgecolor='black', label=f'{inversed_labels_to_num_dict[order_of_classes[0]]}',
+            fc=(1, 1, 0, 0.5))
+    ax.hist(probas_dist[:, 1], edgecolor='black', label=f'{inversed_labels_to_num_dict[order_of_classes[1]]}',
+            fc=(1, 0, 1, 0.5))
+    ax.set_title('All Confidence Scores of BB Model')
+    plt.tight_layout()
+    plt.legend()
+    fig_path = os.sep.join([experiment_dir, 'confidence_scores_about_classes.png'])
+    plt.savefig(fig_path)
     # plt.show()
 
     # calc which confidence intervals had lower MAE
