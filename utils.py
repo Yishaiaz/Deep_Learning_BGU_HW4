@@ -1,19 +1,18 @@
 import logging
+import os
 from typing import List, Tuple
 
-import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import seaborn as sns
+import table_evaluator
 import tensorflow as tf
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.manifold import TSNE
-from keras.models import load_model
 
 from global_vars import SEED
 from preprocessing_utils import gather_numeric_and_categorical_columns
-import table_evaluator
 
 
 def log(path, file):
@@ -115,14 +114,14 @@ def tsne(df: pd.DataFrame, non_numeric_columns: list, hue: str, filename: str = 
         plt.show()
 
 
-def model_confidence_score_distribution(model):
+def model_confidence_score_distribution(model, hue: str = "class"):
     confidence_score_distribution_arr = model.model_confidence_score_distribution()
 
     y_test_copy = model.y_test.copy()
     y_test_copy.reset_index(drop=True, inplace=True)
     confidence_score_distribution_arr = confidence_score_distribution_arr[
         np.arange(0, len(confidence_score_distribution_arr), 1)[:, np.newaxis], y_test_copy.values]
-    sns.displot(pd.concat([pd.DataFrame(confidence_score_distribution_arr, columns=["prediction"]), y_test_copy], axis=1), x="prediction", hue="class")
+    sns.displot(pd.concat([pd.DataFrame(confidence_score_distribution_arr, columns=["prediction"]), y_test_copy], axis=1), x="prediction", hue=hue)
     plt.title("Confidence score distribution histogram with 'auto' bins")
     plt.show()
 
@@ -139,16 +138,15 @@ def evaluate_machine_learning_efficacy(generated_samples, labels, X_test, y_test
     return model.score(X_test, y_test)
 
 
-def evaluate_using_tsne(samples, labels, df_columns, index, dir):
+def evaluate_using_tsne(samples, labels, df_columns, categorical_columns, index, dir):
     df = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1), columns=df_columns + ['class'])
-    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df)
     tsne(df, categorical_columns, hue='class', filename=f'{dir}/{index}_tsne', save_figure=True)
 
 
 def draw_boxplot(real_samples: np.array, generated_samples: np.array, path_to_save_fig: str):
-    def draw_plot(ax, data, offset,edge_color, fill_color, label: str):
+    def draw_plot(ax, data, offset,edge_color, fill_color):
         pos = np.arange(data.shape[1])+offset
-        bp = ax.boxplot(data, positions= pos, widths=0.2, patch_artist=True)#, label=label)
+        bp = ax.boxplot(data, positions= pos, widths=0.2, patch_artist=True)
         for element in ['boxes', 'whiskers', 'fliers', 'medians', 'caps']:
             plt.setp(bp[element], color=edge_color)
         for patch in bp['boxes']:
@@ -169,15 +167,8 @@ def real_to_generated_distance(real_df: pd.DataFrame, fake_df: pd.DataFrame, cat
     return column_correlation, euclidean_distance
 
 
-def generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real, num_of_samples):
-    generator = load_model(f"{experiment_dir}/generator.h5")
-
-    samples, generated_samples, labels_input = gan_sample_generator.generate_samples(generator,
-                                                                                     random_latent_noise=True)
-    # extract N random samples
-    samples_reduced = np.array(samples)[:num_of_samples, :]
-
-    path_to_box_plot = os.sep.join([experiment_dir, 'boxplot_save.png'])
+def generate_and_draw_boxplots(experiment_dir, samples_reduced, df_real, num_of_samples):
+    path_to_box_plot = os.sep.join([experiment_dir, 'boxplot.png'])
     draw_boxplot(real_samples=df_real.values[:num_of_samples, :-1],
                  generated_samples=np.asarray(samples_reduced),
                  path_to_save_fig=path_to_box_plot)

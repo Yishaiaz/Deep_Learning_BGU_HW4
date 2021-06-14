@@ -24,9 +24,9 @@ class SimpleCLFForEvaluation:
 
         self.labels_to_num_dict = labels_to_num_dict
 
-        self.data_x, self.data_y, _, _ = read_and_prepare_dataset(self.data_path,
-                                                                  labels_to_num_dict=self.labels_to_num_dict,
-                                                                  decode_categorical_columns=True)
+        self.data_x, self.data_y, _, _, _ = read_and_prepare_dataset(self.data_path,
+                                                                     labels_to_num_dict=self.labels_to_num_dict,
+                                                                     decode_categorical_columns=True)
         self.X_train, self.X_test, self.y_train, self.y_test = split_into_train_test(self.data_x, self.data_y)
 
     def train_and_score_model(self):

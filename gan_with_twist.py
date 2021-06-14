@@ -10,7 +10,6 @@ from tensorflow.python.keras import Input
 from tensorflow.python.keras.optimizer_v2.rmsprop import RMSprop
 
 from global_vars import LATENT_NOISE_SIZE, GENERATOR_LR, CRITIC_LR, CRITIC_DROPOUT, SEED
-from utils import evaluate_machine_learning_efficacy
 
 
 class GANBBModel:
@@ -139,7 +138,7 @@ class GANBBModel:
 
         return X, confidence_scores_input
 
-    def train(self, fake_dataset_size, batch_size, gan_sample_generator, X_test, y_test, n_epochs, experiment_dir, logger):
+    def train(self, fake_dataset_size, batch_size, gan_sample_generator, n_epochs, experiment_dir, logger):
         """train the generator and discriminator"""
 
         max_score_for_fixed_latent_noise = 0.

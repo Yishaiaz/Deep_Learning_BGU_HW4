@@ -138,4 +138,4 @@ def read_and_prepare_dataset(path_to_arff_file: str,
 
     column_idx_to_scaler = {X.columns.get_loc(col): column_to_scaler[col] for col in numeric_columns}
 
-    return X, y, column_idx_to_scaler, column_idx_to_ohe
+    return X, y, column_idx_to_scaler, column_idx_to_ohe, target_column_name

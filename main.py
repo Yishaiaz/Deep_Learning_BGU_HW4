@@ -1,8 +1,4 @@
-import os
-
 import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
 from keras.models import load_model
 from table_evaluator import TableEvaluator
 from tensorflow.python.ops.numpy_ops import np_config
@@ -10,26 +6,39 @@ from tensorflow.python.ops.numpy_ops import np_config
 from CGAN import CGAN
 from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
+from gan_with_twist import GANBBModel
 from random_forest_model import *
 from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, \
-    model_confidence_score_distribution, generate_and_draw_boxplots,\
+    model_confidence_score_distribution, generate_and_draw_boxplots, \
     real_to_generated_distance, invert_labels_to_num_dict
 
 np_config.enable_numpy_behavior()
 
 
-def part1_section3(experiment_dir, gan_sample_generator, real_df: pd.DataFrame, df_real_not_normalized: pd.DataFrame):
+def part1_section3(num_of_random_samples, experiment_dir, gan_sample_generator, df_fake: pd.DataFrame, df_real_not_normalized: pd.DataFrame):
+    df_real_not_normalized = df_real_not_normalized.iloc[:, :-1]
+    # Gather numeric and categorical columns into a list
+    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
+    numeric_columns = numeric_columns.tolist()
+    categorical_columns = categorical_columns.tolist()
+
     # load models
     generator = load_model(f"{experiment_dir}/generator.h5")
     critic = load_model(f"{experiment_dir}/critic.h5")
 
     samples, generated_samples, labels_input = gan_sample_generator.generate_samples(generator, random_latent_noise=True)
-    # extract 100 random samples
-    generated_samples_reduced = np.array(generated_samples)[:100, :]
-    labels_input_reduced = labels_input[:100]
+
+    # extract random samples
+    generated_samples_reduced = np.array(generated_samples)[:num_of_random_samples, :]
+    labels_input_reduced = labels_input[:num_of_random_samples]
+    samples_reduced = np.array(samples)[:num_of_random_samples, :]
+
+    df_samples_reduced = pd.DataFrame(data=np.concatenate((np.array(samples_reduced), labels_input_reduced.reshape(-1, 1)), axis=1),
+                                      columns=df_fake.columns.tolist())
+    df_samples_reduced[numeric_columns] = df_samples_reduced[numeric_columns].apply(pd.to_numeric)
 
     # create inverted labels for the fake samples
-    y = np.ones((100, 1))
+    y = np.ones((num_of_random_samples, 1))
 
     if IS_LABEL_CONDITIONAL:
         accuracy = critic.evaluate([generated_samples_reduced, labels_input_reduced], y)[1]
@@ -39,22 +48,25 @@ def part1_section3(experiment_dir, gan_sample_generator, real_df: pd.DataFrame, 
         pred = critic.predict([generated_samples_reduced, labels_input_reduced])
 
     # extract samples that fooled the critic
-    samples_that_fooled_the_critic = np.array(samples)[np.argwhere(pred > 0.7)[:, 0].tolist()]
+    samples_that_fooled_the_critic = np.array(samples)[np.argwhere(pred > 0.5)[:, 0].tolist()]
     # extract samples that not fooled the critic
     samples_that_not_fooled_the_critic = np.array(samples)[np.argwhere(pred < 0.5)[:, 0].tolist()]
 
     # boxplots
-    generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real=df_real_not_normalized, num_of_samples=100)
+    generate_and_draw_boxplots(experiment_dir, df_samples_reduced[numeric_columns], df_real=df_real_not_normalized[numeric_columns], num_of_samples=num_of_random_samples)
 
     # distances between real and fake
-    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
-    column_correlation, euclidean_distance = real_to_generated_distance(real_df=df_real_not_normalized, fake_df=pd.DataFrame(data=samples, columns=real_df.columns.values[:-1]), categorical_columns=categorical_columns)
+    column_correlation, euclidean_distance = real_to_generated_distance(real_df=df_real_not_normalized, fake_df=df_fake.iloc[:, :-1], categorical_columns=categorical_columns)
 
     return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, column_correlation, euclidean_distance
 
 
-def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
-               df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized):
+def train_cgan(ds, df_real, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
+               X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized):
+    df_columns = df_real_not_normalized.iloc[:, :-1].columns.tolist()
+    # Gather numeric and categorical columns into a list
+    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
+
     cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
                                               column_idx_to_scaler,
@@ -71,7 +83,7 @@ def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_t
                                                                                        gan_sample_generator,
                                                                                        X_test, y_test,
                                                                                        N_EPOCHS,
-                                                                                       df_columns,
+                                                                                       df_real_not_normalized.iloc[:, :-1],
                                                                                        experiment_dir,
                                                                                        logger)
 
@@ -79,7 +91,8 @@ def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_t
     target_column_name = df_real.columns[-1]
     df_fake = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1),
                            columns=df_columns + [target_column_name])
-    table_evaluator = TableEvaluator(df_real, df_fake)
+    df_fake[numeric_columns] = df_fake[numeric_columns].apply(pd.to_numeric)
+    table_evaluator = TableEvaluator(df_real_not_normalized, df_fake, cat_cols=categorical_columns.tolist())
     #table_evaluator.visual_evaluation() TODO
     logger.info(table_evaluator.evaluate(target_col=target_column_name))
 
@@ -96,10 +109,11 @@ def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_t
     logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
         max_score_for_fixed_latent_noise,
         max_score_for_random_latent_noise))
+    logger.info("")
 
     # part 1 section 3
     accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, \
-    column_correlation, euclidean_distance = part1_section3(experiment_dir, gan_sample_generator, df_real, df_real_not_normalized)
+    column_correlation, euclidean_distance = part1_section3(NUM_OF_RANDOM_SAMPLES, experiment_dir, gan_sample_generator, df_fake, df_real_not_normalized)
 
     logger.info("")
     logger.info("100 random generated samples were able to achieve {} accuracy".format(accuracy))
@@ -110,7 +124,11 @@ def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_t
 
 
 def train_cwgan(X, y, df_real, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
-                df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized):
+                X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized):
+    df_columns = df_real_not_normalized.iloc[:, :-1].columns.tolist()
+    # Gather numeric and categorical columns into a list
+    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
+
     gan = CWGAN(input_size, columns_size, num_classes,
                 is_label_conditional=IS_LABEL_CONDITIONAL, positive_negative_labels=positive_negative_labels)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
@@ -122,14 +140,16 @@ def train_cwgan(X, y, df_real, input_size, columns_size, num_classes, column_idx
                                               num_positive_negative_classes=num_positive_negative_classes,
                                               evaluation_mode=True,
                                               positive_negative_labels=positive_negative_labels)
-    c1_hist, c2_hist, g_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, labels = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
-        X_test, y_test, N_EPOCHS, df_columns, experiment_dir, logger)
+    c_loss1_hist, c_loss2_hist, g_loss_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, labels = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
+        X_test, y_test, N_EPOCHS, df_real_not_normalized.iloc[:, :-1], experiment_dir, logger)
 
     # table evaluation
     target_column_name = df_real.columns[-1]
     df_fake = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1),
                            columns=df_columns + [target_column_name])
-    table_evaluator = TableEvaluator(df_real, df_fake)
+    df_fake[numeric_columns] = df_fake[numeric_columns].apply(pd.to_numeric)
+
+    table_evaluator = TableEvaluator(df_real_not_normalized, df_fake, cat_cols=categorical_columns.tolist())
     #table_evaluator.visual_evaluation() TODO
     logger.info(table_evaluator.evaluate(target_col=target_column_name))
 
@@ -137,12 +157,13 @@ def train_cwgan(X, y, df_real, input_size, columns_size, num_classes, column_idx
     df_fake.to_csv(f"{experiment_dir}/df_fake.csv", index=False)
 
     # line plots of loss
-    plot_loss_history(c1_hist, c2_hist, g_hist, experiment_dir)
+    plot_loss_history(c_loss1_hist, c_loss2_hist, g_loss_hist, experiment_dir)
 
     logger.info("")
     logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
         max_score_for_fixed_latent_noise,
         max_score_for_random_latent_noise))
+    logger.info("")
 
 
 def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
@@ -230,56 +251,51 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     # calc which confidence intervals had lower MAE
 
 
+def train_gan_with_twist(model, df_real, input_size, columns_size, column_idx_to_scaler, column_idx_to_ohe, num_samples,
+                         positive_negative_labels, experiment_dir, logger, df_real_not_normalized):
 
+    df_columns = df_real_not_normalized.iloc[:, :-1].columns.tolist()
+    # Gather numeric and categorical columns into a list
+    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
 
-def train_gan_with_twist(ds, df_real, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
-               df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger):
-    pass
-    # cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL)
-    # gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
-    #                                           column_idx_to_scaler,
-    #                                           column_idx_to_ohe,
-    #                                           columns_size,
-    #                                           num_samples,
-    #                                           is_label_conditional=IS_LABEL_CONDITIONAL,
-    #                                           num_positive_negative_classes=num_positive_negative_classes,
-    #                                           evaluation_mode=True,
-    #                                           positive_negative_labels=positive_negative_labels)
-    # d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch, max_score_for_fixed_latent_noise, \
-    # max_score_for_random_latent_noise, samples, generated_samples, labels = cgan.train(ds,
-    #                                                                                    BATCH_SIZE,
-    #                                                                                    gan_sample_generator,
-    #                                                                                    X_test, y_test,
-    #                                                                                    N_EPOCHS,
-    #                                                                                    df_columns,
-    #                                                                                    experiment_dir,
-    #                                                                                    logger)
-    #
-    # # table evaluation
-    # target_column_name = df_real.columns[-1]
-    # df_fake = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1),
-    #                        columns=df_columns + [target_column_name])
-    # table_evaluator = TableEvaluator(df_real, df_fake)
-    # #table_evaluator.visual_evaluation() TODO
-    # logger.info(table_evaluator.evaluate(target_col=target_column_name))
-    #
-    # # save fake dataframe
-    # df_fake.to_csv(f"{experiment_dir}/df_fake.csv", index=False)
-    #
-    # # line plots of loss
-    # plot_loss_history(d_loss1_epoch, d_loss2_epoch, g_loss_epoch, experiment_dir)
-    #
-    # # line plots of accuracy
-    # plot_accuracy_history(d_acc1_epoch, d_acc2_epoch, experiment_dir)
-    #
-    # logger.info("")
-    # logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
-    #     max_score_for_fixed_latent_noise,
-    #     max_score_for_random_latent_noise))
-    #
-    # # part 1 section 3
+    gan_bb_model = GANBBModel(model, input_size, columns_size)
+    gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
+                                              column_idx_to_scaler,
+                                              column_idx_to_ohe,
+                                              columns_size,
+                                              num_samples,
+                                              is_label_conditional=False,
+                                              evaluation_mode=True,
+                                              positive_negative_labels=positive_negative_labels)
+    d_loss1_epoch, d_loss2_epoch, g_loss_epoch, min_mse_score_for_fixed_latent_noise, \
+    min_score_for_random_latent_noise, samples, generated_samples, labels = gan_bb_model.train(num_samples,
+                                                                                               BATCH_SIZE,
+                                                                                               gan_sample_generator,
+                                                                                               N_EPOCHS,
+                                                                                               experiment_dir,
+                                                                                               logger)
+
+    # table evaluation
+    target_column_name = df_real.columns[-1]
+    df_fake = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1),
+                           columns=df_columns + [target_column_name])
+    df_fake[numeric_columns] = df_fake[numeric_columns].apply(pd.to_numeric)
+
+    # save fake dataframe
+    df_fake.to_csv(f"{experiment_dir}/df_fake.csv", index=False)
+
+    # line plots of loss
+    plot_loss_history(d_loss1_epoch, d_loss2_epoch, g_loss_epoch, experiment_dir)
+
+    logger.info("")
+    logger.info(
+        "Best ML MSE score fixed latent noise: {}, random latent noise: {}".format(min_mse_score_for_fixed_latent_noise,
+                                                                                   min_score_for_random_latent_noise))
+    logger.info("")
+
+    # part 2 section 4
     # accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, \
-    # column_correlation, euclidean_distance = part1_section3(experiment_dir, gan_sample_generator, df_real)
+    # column_correlation, euclidean_distance = part1_section3(NUM_OF_RANDOM_SAMPLES, experiment_dir, gan_sample_generator, df_real)
     #
     # logger.info("")
     # logger.info("100 random generated samples were able to achieve {} accuracy".format(accuracy))
@@ -288,81 +304,10 @@ def train_gan_with_twist(ds, df_real, input_size, columns_size, num_classes,  co
     # logger.info("Column correlation between fake and real data: {}".format(column_correlation))
     # logger.info("Euclidean distance between fake and real data: {}".format(euclidean_distance))
 
-# def train_gan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
-#                columns, X_test, y_test):
-#     # Instantiate the WGAN model.
-#     gan = GAN(input_size, columns_size, num_classes)
-#
-#     # # configure checkpoint to save the critic and generator models during the training process
-#     # checkpoint = tf.train.Checkpoint(generator_optimizer=wgan.generator_optimizer,
-#     #                                  critic_optimizer=wgan.critic_optimizer,
-#     #                                  generator=wgan.generator,
-#     #                                  critic=wgan.critic)
-#     #
-#     # # Instantiate GANMonitor Keras callback.
-#     # evaluate_cbk = GANMonitor(column_idx_to_scaler=column_idx_to_scaler,
-#     #                           column_idx_to_ohe=column_idx_to_ohe,
-#     #                           checkpoint=checkpoint,
-#     #                           num_samples=num_samples,
-#     #                           columns=columns,
-#     #                           X_test=X_test,
-#     #                           y_test=y_test)
-#     #
-#     # tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=TF_LOGS_PATH)
-#
-#     # Start training the model
-#     c_loss_per_batch, c_loss_per_epoch, g_loss_per_batch, g_loss_per_epoch, c_acc_per_batch, c_acc_per_epoch = gan.train_gan(ds, BATCH_SIZE, N_EPOCHS)
-#
-#     # generate plots
-#     plot_critic_generator_loss(list(range(1, len(c_loss_per_batch) + 1)), c_loss_per_batch, list(range(1, len(g_loss_per_batch) + 1)), g_loss_per_batch,
-#          "critic loss", "generator loss", "batch step #", "loss", "Critic and Generator loss values per batch step")
-#     plot_critic_generator_loss(list(range(1, len(c_loss_per_epoch) + 1)), c_loss_per_epoch, list(range(1, len(g_loss_per_epoch) + 1)), g_loss_per_epoch,
-#          "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
-#
-#     plot_critic_accuracy(list(range(1, len(c_acc_per_epoch) + 1)), c_acc_per_epoch, "critic accuracy", "epoch #", "acc",
-#                          "Critic accuracy per epoch")
-#
-#     # generate plots
-#     # critic_loss = history.history['generator_loss']
-#     # generator_loss = history.history['critic_loss']
-#     # plot_critic_generator_loss(list(range(1, len(critic_loss) + 1)), critic_loss, list(range(1, len(generator_loss) + 1)), generator_loss,
-#     #      "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
-
-#
-# def train_wgan(ds, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
-#                columns, X_test, y_test):
-#     # Instantiate the WGAN model.
-#     wgan = WGAN(input_size, columns_size, num_classes)
-#
-#     # configure checkpoint to save the critic and generator models during the training process
-#     checkpoint = tf.train.Checkpoint(generator_optimizer=wgan.generator_optimizer,
-#                                      critic_optimizer=wgan.critic_optimizer,
-#                                      generator=wgan.generator,
-#                                      critic=wgan.critic)
-#
-#     # Instantiate GANMonitor Keras callback.
-#     evaluate_cbk = GANMonitor(column_idx_to_scaler=column_idx_to_scaler,
-#                               column_idx_to_ohe=column_idx_to_ohe,
-#                               checkpoint=checkpoint,
-#                               num_samples=num_samples,
-#                               columns=columns,
-#                               X_test=X_test,
-#                               y_test=y_test)
-#
-#     tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir=TF_LOGS_PATH)
-#
-#     # Start training the model
-#     history = wgan.fit(ds, batch_size=BATCH_SIZE, epochs=N_EPOCHS, callbacks=[evaluate_cbk, tensorboard_callback])
-#
-#     # generate plots
-#     critic_loss = history.history['generator_loss']
-#     generator_loss = history.history['critic_loss']
-#     plot_critic_generator_loss(list(range(1, len(critic_loss) + 1)), critic_loss, list(range(1, len(generator_loss) + 1)), generator_loss,
-#          "critic loss", "generator loss", "epoch #", "loss", "Critic and Generator loss values per epoch")
-#
 
 def classifier_evaluation(labels_to_num_dict: dict,
                           data_path: str,
+                          target_column_name,
                           logger):
     logger.info(f"Train RandomForestClassifier model on {data_path} data and evaluate")
     model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=data_path)
@@ -370,7 +315,7 @@ def classifier_evaluation(labels_to_num_dict: dict,
     logger.info(f'model score on real data: {score}')
     logger.info("")
 
-    model_confidence_score_distribution(model)
+    # model_confidence_score_distribution(model, hue=target_column_name) TODO
 
     logger.info(f"Train LogisticRegression model on {data_path} data and evaluate")
     model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=data_path, model_type='LogisticRegression')
@@ -410,12 +355,21 @@ def main():
 
     # load given file into DataFrame
     df_real_not_normalized = read_arff_file_as_dataframe(dataset_path)
+    # Gather numeric and categorical columns into a list
+    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
+    # iterate over all categorical columns and convert decode to string
+    df_real_not_normalized = df_real_not_normalized.apply(lambda col: col.str.decode(encoding='UTF-8') if col.name in categorical_columns else col)
     df_real_not_normalized, df_real_not_normalized_y = df_real_not_normalized.iloc[:, :-1],\
                                                        df_real_not_normalized.iloc[:, -1:]
 
-    X, y, column_idx_to_scaler, column_idx_to_ohe = read_and_prepare_dataset(path_to_arff_file=dataset_path,
-                                                                             labels_to_num_dict=labels_to_num_dict,
-                                                                             decode_categorical_columns=True)
+    # reorder columns
+    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
+    df_real_not_normalized = df_real_not_normalized[numeric_columns.tolist() + categorical_columns.tolist()]
+
+    X, y, column_idx_to_scaler, column_idx_to_ohe, target_column_name = read_and_prepare_dataset(
+        path_to_arff_file=dataset_path,
+        labels_to_num_dict=labels_to_num_dict,
+        decode_categorical_columns=True)
 
     # convert to tf.Dataset api
     ds = convert_x_y_to_tf_dataset(X, y, batch_size=BATCH_SIZE, include_y=True)
@@ -449,34 +403,58 @@ def main():
 
     # classifier evaluation
     if GAN_MODE == 'gan_with_twist':
-        model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=dataset_path)
-        model.train_model()
-        X_test, y_test = model.X_test, model.y_test
-
+        random_forest_model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=dataset_path)
+        random_forest_model.train_model()
+        X_test, y_test = random_forest_model.X_test, random_forest_model.y_test
 
         X_generated, confidences_given = X_test, np.random.random(len(X_test)) # TODO need to replace to generated samples and the confidence that was fed to the GAN
-        part_2_section_4_c(X_generated, confidences_given, clf=model, labels_to_num_dict=labels_to_num_dict, experiment_dir=experiment_dir)
+        part_2_section_4_c(X_generated, confidences_given, clf=random_forest_model, labels_to_num_dict=labels_to_num_dict, experiment_dir=experiment_dir)
     else:
-        X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path, logger)
+        X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path, target_column_name, logger)
+
+    df_real_normalized = pd.concat([X, y], axis=1)
+    df_real_not_normalized = pd.concat([df_real_not_normalized, y], axis=1)
+    positive_negative_labels = [0, 1]
 
     if GAN_MODE == 'cgan':
-        positive_negative_labels = [0, 1]
-        train_cgan(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
-                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized)
+        train_cgan(ds, df_real_normalized, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
+                   num_samples, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized)
     elif GAN_MODE == 'cwgan':
         positive_negative_labels = [1, -1]
-        train_cwgan(X, y, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
-                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized)
+        train_cwgan(X, y, df_real_normalized, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
+                    num_samples, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized)
     else:
-        positive_negative_labels = [0, 1]
-        train_gan_with_twist(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler,
-               column_idx_to_ohe,
-               num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes,
-               positive_negative_labels, experiment_dir, logger)
+        train_gan_with_twist(random_forest_model, df_real_normalized, input_size, columns_size, column_idx_to_scaler,
+                             column_idx_to_ohe, num_samples, X.columns.tolist(), positive_negative_labels, experiment_dir, logger, df_real_not_normalized)
 
 
 if __name__ == '__main__':
     main()
+
+    global BATCH_SIZE
+    global N_EPOCHS
+    global GENERATOR_LR
+    global CRITIC_LR
+    global CRITIC_DROPOUT
+
+    batch_sizes = [64, 128]
+    n_epochs = [100, 500]
+    generator_lr = [0.0005, 0.00005, 0.000005]
+    critic_lr = [0.0005, 0.00005, 0.000005]
+    critic_dropout = [0.2, 0.5]
+    for batch_size in batch_sizes:
+        for epoch in n_epochs:
+            for dropout in critic_dropout:
+                for g_lr in generator_lr:
+                    for c_lr in critic_lr:
+                        BATCH_SIZE = batch_size
+                        N_EPOCHS = epoch
+                        GENERATOR_LR = g_lr
+                        CRITIC_LR = c_lr
+                        CRITIC_DROPOUT = dropout
+
+                        main()
+
     # input_size = list(ds.take(1).as_numpy_iterator())[0].shape[0]
     # generator = Generator(input_size=input_size)
     # discriminator = Discriminator(input_size=input_size)

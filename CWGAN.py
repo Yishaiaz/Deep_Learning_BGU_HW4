@@ -12,6 +12,7 @@ from tensorflow.python.keras.constraints import Constraint
 from tensorflow.python.keras.optimizer_v2.rmsprop import RMSprop
 
 from global_vars import LATENT_NOISE_SIZE, GENERATOR_LR, CRITIC_LR, CRITIC_DROPOUT, CRITIC_STEPS, SEED
+from preprocessing_utils import gather_numeric_and_categorical_columns
 from utils import evaluate_machine_learning_efficacy, evaluate_using_tsne
 
 
@@ -203,8 +204,10 @@ class CWGAN:
 
         return X, labels_input, y
 
-    def train(self, X, y, batch_size, gan_sample_generator, X_test, y_test, n_epochs, df_columns, experiment_dir, logger):
+    def train(self, X, y, batch_size, gan_sample_generator, X_test, y_test, n_epochs, df_real_not_normalized, experiment_dir, logger):
         """train the generator and critic"""
+
+        numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
 
         # calculate the number of batches per training epoch
         batches_per_epoch = int(X.shape[0] / batch_size)
@@ -284,7 +287,7 @@ class CWGAN:
                     self.gan.save(f"{experiment_dir}/gan.h5")
 
                     # evaluate using tsne
-                    evaluate_using_tsne(samples_fixed_latent_noise, generated_labels, df_columns, epoch, experiment_dir)
+                    evaluate_using_tsne(samples_fixed_latent_noise, generated_labels, df_real_not_normalized.columns.tolist(), categorical_columns.tolist(), epoch, experiment_dir)
 
                 if score_for_random_latent_noise > max_score_for_random_latent_noise:
                     max_score_for_random_latent_noise = score_for_random_latent_noise
