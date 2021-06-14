@@ -156,7 +156,8 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
                                   len(clf.model.classes_)
 
     bins = np.linspace(0, 1, number_of_bins + 1)
-    bins_absolute_errors = [[] for i in bins]
+    bins_absolute_errors = [[] for i in range(number_of_bins)]
+    wrong_class_absolute_errors = [[] for i in range(number_of_bins)]
     inversed_labels_to_num_dict = invert_labels_to_num_dict(labels_to_num_dict)
 
     for pos, class_val in order_of_classes.items():
@@ -165,9 +166,16 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     for row_idx, confidences_of_model in enumerate(probas_dist):
         class_predicted = order_of_classes[np.argmax(confidences_of_model)]
         confidence_of_predicted_class = confidences_of_model[np.argmax(confidences_of_model)]
-        bin_idx_of_pred_confidence = np.digitize(confidence_of_predicted_class, bins=bins)
-        bins_absolute_errors[bin_idx_of_pred_confidence] += np.abs(confidence_of_predicted_class - class_predicted)
+        confidence_of_wrong_predicted_class = confidences_of_model[np.argmin(confidences_of_model)]
+        bin_idx_of_pred_confidence = np.digitize(confidence_of_predicted_class,
+                                                 bins=bins) - 1 if confidence_of_predicted_class < 1 else number_of_bins - 1
+        bin_idx_of_wrong_pred_confidence = np.digitize(confidence_of_wrong_predicted_class,
+                                                       bins=bins) - 1 if confidence_of_wrong_predicted_class < 1 else number_of_bins - 1
+
         confidence_given_to_gan = confidence_scores[row_idx]
+
+        bins_absolute_errors[bin_idx_of_pred_confidence] += [np.abs(confidence_of_predicted_class - confidence_given_to_gan)]
+        wrong_class_absolute_errors[bin_idx_of_wrong_pred_confidence] += [np.abs(confidence_of_wrong_predicted_class - confidence_given_to_gan)]
 
         dist_by_class[class_predicted] += [[confidence_of_predicted_class, confidence_given_to_gan]]
 
@@ -188,8 +196,24 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     plt.legend()
     fig_path = os.sep.join([experiment_dir, 'absolute_error_of_confidence.png'])
     plt.savefig(fig_path)
+    bins_mse = np.zeros(shape=(len(bins_absolute_errors), ))
+    bins_wrong_mse = np.zeros(shape=(len(wrong_class_absolute_errors), ))
+    for bin_idx, bin_absolute_errors in enumerate(bins_absolute_errors):
+        bins_mse[bin_idx] = np.mean(bin_absolute_errors) if len(bin_absolute_errors) > 0 else 0
+        wrong_bin_absolute_error = wrong_class_absolute_errors[bin_idx]
+        bins_wrong_mse[bin_idx] = np.mean(wrong_bin_absolute_error) if len(wrong_bin_absolute_error) > 0 else 0
 
-    # for bin_absolute_errors in bins_absolute_errors:
+    fig, ax = plt.subplots()
+    ax.bar(range(len(bins_mse)), bins_mse, label='MSE: Confidence of prediction', fc=(1, 0, 1, 0.6))
+    ax.bar(range(len(bins_wrong_mse)), bins_wrong_mse, label='MSE: Confidence of wrong prediction', fc=(0, 1, 0, 0.4))
+    ax.set_xticks(range(len(bins_mse)))
+    ax.set_xticklabels([f'{bins[i]:.2f}-{bins[i+1]:.2f}' for i in range(len(bins)-1)])
+    ax.set_ylim((0, 1))
+    fig.suptitle('Mean Absolute Error between confidence\nof GAN and BB prediction confidence')
+    plt.tight_layout()
+    plt.legend()
+    fig_path = os.sep.join([experiment_dir, 'mean_absolute_error_of_confidences.png'])
+    plt.savefig(fig_path)
         #todo complete code here
     # plt.show()
 
@@ -432,7 +456,7 @@ def main():
     elif GAN_MODE == 'cwgan':
         positive_negative_labels = [1, -1]
         train_cwgan(X, y, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
-                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
+                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized)
     else:
         positive_negative_labels = [0, 1]
         train_gan_with_twist(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler,
