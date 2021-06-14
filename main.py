@@ -1,3 +1,6 @@
+import os
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from keras.models import load_model
@@ -9,12 +12,13 @@ from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from random_forest_model import *
 from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, \
-    model_confidence_score_distribution, generate_and_draw_boxplots, real_to_generated_distance
+    model_confidence_score_distribution, generate_and_draw_boxplots,\
+    real_to_generated_distance, invert_labels_to_num_dict
 
 np_config.enable_numpy_behavior()
 
 
-def part1_section3(experiment_dir, gan_sample_generator, real_df: pd.DataFrame):
+def part1_section3(experiment_dir, gan_sample_generator, real_df: pd.DataFrame, df_real_not_normalized: pd.DataFrame):
     # load models
     generator = load_model(f"{experiment_dir}/generator.h5")
     critic = load_model(f"{experiment_dir}/critic.h5")
@@ -40,17 +44,17 @@ def part1_section3(experiment_dir, gan_sample_generator, real_df: pd.DataFrame):
     samples_that_not_fooled_the_critic = np.array(samples)[np.argwhere(pred < 0.5)[:, 0].tolist()]
 
     # boxplots
-    generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real=real_df, num_of_samples=100)
+    generate_and_draw_boxplots(experiment_dir, gan_sample_generator, df_real=df_real_not_normalized, num_of_samples=100)
 
     # distances between real and fake
-    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(real_df)
-    column_correlation, euclidean_distance = real_to_generated_distance(real_df=real_df.iloc[:, :-1], fake_df=pd.DataFrame(data=samples, columns=real_df.columns.values[:-1]), categorical_columns=categorical_columns)
+    numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
+    column_correlation, euclidean_distance = real_to_generated_distance(real_df=df_real_not_normalized, fake_df=pd.DataFrame(data=samples, columns=real_df.columns.values[:-1]), categorical_columns=categorical_columns)
 
     return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, column_correlation, euclidean_distance
 
 
 def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_to_scaler, column_idx_to_ohe, num_samples,
-               df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger):
+               df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized):
     cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
                                               column_idx_to_scaler,
@@ -95,7 +99,7 @@ def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_t
 
     # part 1 section 3
     accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, \
-    column_correlation, euclidean_distance = part1_section3(experiment_dir, gan_sample_generator, df_real)
+    column_correlation, euclidean_distance = part1_section3(experiment_dir, gan_sample_generator, df_real, df_real_not_normalized)
 
     logger.info("")
     logger.info("100 random generated samples were able to achieve {} accuracy".format(accuracy))
@@ -106,7 +110,7 @@ def train_cgan(ds, df_real, input_size, columns_size, num_classes,  column_idx_t
 
 
 def train_cwgan(X, y, df_real, input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe, num_samples,
-                df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger):
+                df_columns, X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized):
     gan = CWGAN(input_size, columns_size, num_classes,
                 is_label_conditional=IS_LABEL_CONDITIONAL, positive_negative_labels=positive_negative_labels)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
@@ -139,6 +143,58 @@ def train_cwgan(X, y, df_real, input_size, columns_size, num_classes, column_idx
     logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
         max_score_for_fixed_latent_noise,
         max_score_for_random_latent_noise))
+
+
+def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
+                       clf: SimpleCLFForEvaluation,
+                       labels_to_num_dict: dict,
+                       experiment_dir: str = '',
+                       number_of_bins: int = 5):
+    probas_dist = clf.model_confidence_score_distribution(X_generated)
+    dist_by_class = {}
+    order_of_classes, n_classes = {position: class_value  for position, class_value in enumerate(clf.model.classes_)}, \
+                                  len(clf.model.classes_)
+
+    bins = np.linspace(0, 1, number_of_bins + 1)
+    bins_absolute_errors = [[] for i in bins]
+    inversed_labels_to_num_dict = invert_labels_to_num_dict(labels_to_num_dict)
+
+    for pos, class_val in order_of_classes.items():
+        dist_by_class[class_val] = []
+
+    for row_idx, confidences_of_model in enumerate(probas_dist):
+        class_predicted = order_of_classes[np.argmax(confidences_of_model)]
+        confidence_of_predicted_class = confidences_of_model[np.argmax(confidences_of_model)]
+        bin_idx_of_pred_confidence = np.digitize(confidence_of_predicted_class, bins=bins)
+        bins_absolute_errors[bin_idx_of_pred_confidence] += np.abs(confidence_of_predicted_class - class_predicted)
+        confidence_given_to_gan = confidence_scores[row_idx]
+
+        dist_by_class[class_predicted] += [[confidence_of_predicted_class, confidence_given_to_gan]]
+
+    fig, axis = plt.subplots((n_classes))
+    # plot confidences of each class
+    for idx, class_value in enumerate(order_of_classes.values()):
+        confidence_vals = np.asarray(dist_by_class[class_value])
+        abs_error_between_confidence = np.abs(confidence_vals[:, 0] - confidence_vals[:, 1])
+
+        axis[idx].plot(np.arange(0, len(abs_error_between_confidence), 1), abs_error_between_confidence)
+
+        axis[idx].set(ylim=(0, 1))
+        class_label = inversed_labels_to_num_dict[class_value]
+        axis[idx].set_title(f'Predicted Class={class_label}')
+
+    fig.suptitle('Absolute Error between confidence\nof GAN and BB prediction confidence')
+    plt.tight_layout()
+    plt.legend()
+    fig_path = os.sep.join([experiment_dir, 'absolute_error_of_confidence.png'])
+    plt.savefig(fig_path)
+
+    # for bin_absolute_errors in bins_absolute_errors:
+        #todo complete code here
+    # plt.show()
+
+    # calc which confidence intervals had lower MAE
+
 
 
 
@@ -298,7 +354,7 @@ def main():
     num_classes = 2
 
     # diabetes dataset
-    diabetes_labels_to_num_dict = {'tested_positive': 1 if GAN_MODE == 'cgan' or GAN_MODE == 'gan_with_twist' else -1, 'tested_negative': 0 if GAN_MODE == 'cgan' else 1}
+    diabetes_labels_to_num_dict = {'tested_positive': 1 if GAN_MODE == 'cgan' or GAN_MODE == 'gan_with_twist' else -1, 'tested_negative': 0 if GAN_MODE == 'cgan' or GAN_MODE == 'gan_with_twist' else 1}
     diabetes_columns_size = [1] * 8
     diabetes_num_positive_negative_classes = (500, 268)
 
@@ -317,6 +373,11 @@ def main():
         labels_to_num_dict = german_credit_labels_to_num_dict
         columns_size = german_credit_columns_size
         num_positive_negative_classes = german_credit_num_positive_negative_classes
+
+    # load given file into DataFrame
+    df_real_not_normalized = read_arff_file_as_dataframe(dataset_path)
+    df_real_not_normalized, df_real_not_normalized_y = df_real_not_normalized.iloc[:, :-1],\
+                                                       df_real_not_normalized.iloc[:, -1:]
 
     X, y, column_idx_to_scaler, column_idx_to_ohe = read_and_prepare_dataset(path_to_arff_file=dataset_path,
                                                                              labels_to_num_dict=labels_to_num_dict,
@@ -355,15 +416,19 @@ def main():
     # classifier evaluation
     if GAN_MODE == 'gan_with_twist':
         model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=dataset_path)
-        model.train_and_score_model()
+        model.train_model()
         X_test, y_test = model.X_test, model.y_test
+
+
+        X_generated, confidences_given = X_test, np.random.random(len(X_test)) # TODO need to replace to generated samples and the confidence that was fed to the GAN
+        part_2_section_4_c(X_generated, confidences_given, clf=model, labels_to_num_dict=labels_to_num_dict, experiment_dir=experiment_dir)
     else:
         X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path, logger)
 
     if GAN_MODE == 'cgan':
         positive_negative_labels = [0, 1]
         train_cgan(ds, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
-                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger)
+                   num_samples, X.columns.tolist(), X_test, y_test, num_positive_negative_classes, positive_negative_labels, experiment_dir, logger, df_real_not_normalized)
     elif GAN_MODE == 'cwgan':
         positive_negative_labels = [1, -1]
         train_cwgan(X, y, pd.concat([X, y], axis=1), input_size, columns_size, num_classes, column_idx_to_scaler, column_idx_to_ohe,
