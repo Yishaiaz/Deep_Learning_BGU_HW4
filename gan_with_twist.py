@@ -104,6 +104,7 @@ class GANBBModel:
         gen_output = generator.output
 
         # get y output of the BB model
+        # todo change to predict_proba - take only positive confidence
         bb_model_output = bb_model(gen_output)
 
         # connect generator output and confidence_score input from generator and BB model y output as inputs to discriminator
@@ -158,6 +159,7 @@ class GANBBModel:
                 # generate 'fake' samples
                 X_fake, confidence_scores_input = self.generate_fake_samples(batch_size)
 
+                # todo change to predict_proba - take only positive confidence
                 # get BB model output for the current generated samples
                 y_outputs = self.bb_model.predict(X_fake)
 
@@ -183,11 +185,12 @@ class GANBBModel:
 
                 g_loss_epoch.append(g_loss)
                 d_loss_epoch.append(d_loss)
+                # todo aggregate all mse between y_outputs and positive confidence
 
             # store loss & accuracy
             g_loss_hist.append(np.mean(g_loss_epoch))
             d_loss_hist.append(np.mean(d_loss_epoch))
-
+            # todo mean for all y_outputs and positive confidence aggregation and aggregate per epoch
             # logging
             logger.info("epoch {} discriminator - d_loss: {}, generator - g_loss: {}".format(epoch,
                                                                                              d_loss_hist[-1],
