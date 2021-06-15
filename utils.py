@@ -169,9 +169,9 @@ def real_to_generated_distance(real_df: pd.DataFrame, fake_df: pd.DataFrame, cat
     return column_correlation, euclidean_distance
 
 
-def generate_and_draw_boxplots(experiment_dir, samples_reduced, df_real, num_of_samples):
+def generate_and_draw_boxplots(experiment_dir, samples_reduced, df_real):
     path_to_box_plot = os.sep.join([experiment_dir, 'boxplot.png'])
-    draw_boxplot(real_samples=df_real.values[:num_of_samples, :-1],
+    draw_boxplot(real_samples=df_real.values,
                  generated_samples=np.asarray(samples_reduced),
                  path_to_save_fig=path_to_box_plot)
 

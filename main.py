@@ -52,7 +52,7 @@ def part1_section3(generator, critic, num_of_random_samples, experiment_dir, gan
 
     # boxplots
     generate_and_draw_boxplots(experiment_dir, df_samples_reduced[numeric_columns],
-                               df_real=df_real_not_normalized[numeric_columns], num_of_samples=num_of_random_samples)
+                               df_real=df_real_not_normalized[numeric_columns].iloc[:num_of_random_samples, :])
 
     # distances between real and fake
     column_correlation, euclidean_distance = real_to_generated_distance(real_df=df_real_not_normalized,
