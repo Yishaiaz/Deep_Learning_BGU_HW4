@@ -183,7 +183,7 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
 
     for pos, class_val in order_of_classes.items():
         dist_by_class[class_val] = []
-
+    # todo: choose one bucket to draw info from ([0,1] from the confidences)
     for row_idx, confidences_of_model in enumerate(probas_dist):
         class_predicted = order_of_classes[np.argmax(confidences_of_model)]
         confidence_of_predicted_class = confidences_of_model[np.argmax(confidences_of_model)]
