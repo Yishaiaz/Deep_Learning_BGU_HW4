@@ -153,8 +153,8 @@ def draw_boxplot(real_samples: np.array, generated_samples: np.array, path_to_sa
             patch.set(facecolor=fill_color)
         return bp
     fig, ax = plt.subplots()
-    bp1 = draw_plot(ax, real_samples, -0.1, "red", "white", label='Real')
-    bp2 = draw_plot(ax, generated_samples, +0.1, "blue", "white", label='Generated')
+    bp1 = draw_plot(ax, real_samples, -0.1, "red", "white")
+    bp2 = draw_plot(ax, generated_samples, +0.1, "blue", "white")
     plt.xticks(ticks=np.arange(real_samples.shape[1]), labels=[f'F{i + 1}' for i in np.arange(real_samples.shape[1])])
     plt.legend([bp1["boxes"][0], bp2["boxes"][0]], ['Real', 'Generated'], loc='upper right')
     plt.tight_layout()
