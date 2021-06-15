@@ -5,7 +5,7 @@ from table_evaluator import TableEvaluator
 from tensorflow.python.ops.numpy_ops import np_config
 
 from CGAN import CGAN
-from CWGAN import CWGAN, ClipConstraint, wasserstein_loss
+from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from gan_with_twist import GANBBModel
 from random_forest_model import *
@@ -16,7 +16,8 @@ from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, 
 np_config.enable_numpy_behavior()
 
 
-def part1_section3(generator, critic, num_of_random_samples, experiment_dir, gan_sample_generator, df_fake: pd.DataFrame, df_real_not_normalized: pd.DataFrame):
+def part1_section3(generator, critic, num_of_random_samples, experiment_dir, gan_sample_generator,
+                   df_fake: pd.DataFrame, df_real_not_normalized: pd.DataFrame):
     df_real_not_normalized = df_real_not_normalized.iloc[:, :-1]
     # Gather numeric and categorical columns into a list
     numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
@@ -50,10 +51,13 @@ def part1_section3(generator, critic, num_of_random_samples, experiment_dir, gan
     samples_that_not_fooled_the_critic = np.array(samples)[np.argwhere(pred < 0.5)[:, 0].tolist()]
 
     # boxplots
-    generate_and_draw_boxplots(experiment_dir, df_samples_reduced[numeric_columns], df_real=df_real_not_normalized[numeric_columns], num_of_samples=num_of_random_samples)
+    generate_and_draw_boxplots(experiment_dir, df_samples_reduced[numeric_columns],
+                               df_real=df_real_not_normalized[numeric_columns], num_of_samples=num_of_random_samples)
 
     # distances between real and fake
-    column_correlation, euclidean_distance = real_to_generated_distance(real_df=df_real_not_normalized, fake_df=df_fake.iloc[:, :-1], categorical_columns=categorical_columns)
+    column_correlation, euclidean_distance = real_to_generated_distance(real_df=df_real_not_normalized,
+                                                                        fake_df=df_fake.iloc[:, :-1],
+                                                                        categorical_columns=categorical_columns)
 
     return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, column_correlation, euclidean_distance
 
@@ -333,6 +337,7 @@ def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size
 def classifier_evaluation(labels_to_num_dict: dict,
                           data_path: str,
                           target_column_name,
+                          experiment_dir,
                           logger):
     logger.info(f"Train RandomForestClassifier model on {data_path} data and evaluate")
     model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=data_path)
@@ -340,7 +345,7 @@ def classifier_evaluation(labels_to_num_dict: dict,
     logger.info(f'model score on real data: {score}')
     logger.info("")
 
-    # model_confidence_score_distribution(model, hue=target_column_name) TODO
+    model_confidence_score_distribution(model, experiment_dir, logger, hue=target_column_name)
 
     logger.info(f"Train LogisticRegression model on {data_path} data and evaluate")
     model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=data_path, model_type='LogisticRegression')
@@ -432,9 +437,10 @@ def main():
     if GAN_MODE == 'gan_with_twist':
         random_forest_model = SimpleCLFForEvaluation(labels_to_num_dict, data_path=dataset_path)
         random_forest_model.train_model()
+        model_confidence_score_distribution(random_forest_model, experiment_dir, logger, hue=target_column_name)
         X_test, y_test = random_forest_model.X_test, random_forest_model.y_test
     else:
-        X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path, target_column_name, logger)
+        X_test, y_test = classifier_evaluation(labels_to_num_dict, dataset_path, target_column_name, experiment_dir, logger)
 
     df_real_normalized = pd.concat([X, y], axis=1)
     df_real_not_normalized = pd.concat([df_real_not_normalized, y], axis=1)

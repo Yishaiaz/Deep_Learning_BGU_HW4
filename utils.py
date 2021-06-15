@@ -115,7 +115,7 @@ def tsne(df: pd.DataFrame, non_numeric_columns: list, hue: str, filename: str = 
         plt.show()
 
 
-def model_confidence_score_distribution(model, hue: str = "class"):
+def model_confidence_score_distribution(model, experiment_dir, logger, hue: str = "class"):
     confidence_score_distribution_arr = model.model_confidence_score_distribution()
 
     y_test_copy = model.y_test.copy()
@@ -124,10 +124,11 @@ def model_confidence_score_distribution(model, hue: str = "class"):
         np.arange(0, len(confidence_score_distribution_arr), 1)[:, np.newaxis], y_test_copy.values]
     sns.displot(pd.concat([pd.DataFrame(confidence_score_distribution_arr, columns=["prediction"]), y_test_copy], axis=1), x="prediction", hue=hue)
     plt.title("Confidence score distribution histogram with 'auto' bins")
-    plt.show()
+    plt.savefig(f'{experiment_dir}/random_forest_confidence_score_distribution.png', bbox_inches="tight")
+    plt.close()
 
     df_describe = pd.DataFrame(confidence_score_distribution_arr)
-    print("Confidence score distribution statistics: {}".format(df_describe.describe()))
+    logger.info("Confidence score distribution statistics: {}".format(df_describe.describe()))
 
     return confidence_score_distribution_arr
 
