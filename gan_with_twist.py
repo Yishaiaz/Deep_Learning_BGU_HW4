@@ -10,6 +10,8 @@ from tensorflow.python.keras import Input
 from tensorflow.python.keras.optimizer_v2.rmsprop import RMSprop
 
 from global_vars import LATENT_NOISE_SIZE, GENERATOR_LR, CRITIC_LR, CRITIC_DROPOUT, SEED
+from preprocessing_utils import gather_numeric_and_categorical_columns
+from utils import evaluate_using_tsne
 
 
 class GANBBModel:
@@ -33,10 +35,11 @@ class GANBBModel:
         self._discriminator_lr = kwargs.get('discriminator_lr', CRITIC_LR)
         self._discriminator_dropout = kwargs.get('discriminator_dropout', CRITIC_DROPOUT)
 
+        self.bb_model = bb_model
         self.generator = self._build_generator()
         self.discriminator = self._build_discriminator()
-        self.gan = self._define_gan(self.generator, self.discriminator)
-        self.bb_model = bb_model
+        self.generator_optimizer = RMSprop(learning_rate=self._generator_lr)
+        self.generator_loss_fn = tf.keras.losses.MeanSquaredError()
 
     def _build_discriminator(self):
         # sample input
@@ -93,31 +96,6 @@ class GANBBModel:
 
         return generator
 
-    def _define_gan(self, generator, discriminator, bb_model):
-        # make weights in the discriminator not trainable
-        discriminator.trainable = False
-
-        # get noise and confidence_score inputs from generator model
-        gen_noise, gen_confidence_score = generator.input
-
-        # get output from the generator model
-        gen_output = generator.output
-
-        # get y output of the BB model
-        # todo change to predict_proba - take only positive confidence
-        bb_model_output = bb_model(gen_output)
-
-        # connect generator output and confidence_score input from generator and BB model y output as inputs to discriminator
-        gan_output = discriminator([gen_output, gen_confidence_score, bb_model_output])
-
-        # define gan model as taking noise and confidence_score and outputting a classification
-        model = Model([gen_noise, gen_confidence_score], gan_output)
-
-        opt = RMSprop(learning_rate=self._generator_lr)
-        model.compile(loss='mse', optimizer=opt)
-
-        return model
-
     def generate_latent_points(self, n_samples):
         """generate points in latent space as input for the generator"""
         # generate points in the latent space
@@ -125,7 +103,7 @@ class GANBBModel:
         # reshape into a batch of inputs for the network
         z_input = z_input.reshape(n_samples, self._latent_noise_size)
         # generate confidence scores
-        confidence_scores = np.random.uniform(n_samples)
+        confidence_scores = np.random.uniform(size=n_samples)
 
         return z_input, confidence_scores
 
@@ -139,12 +117,14 @@ class GANBBModel:
 
         return X, confidence_scores_input
 
-    def train(self, fake_dataset_size, batch_size, gan_sample_generator, n_epochs, experiment_dir, logger):
+    def train(self, fake_dataset_size, batch_size, gan_sample_generator, n_epochs, df_real_not_normalized, experiment_dir, logger):
         """train the generator and discriminator"""
 
-        max_score_for_fixed_latent_noise = 0.
-        max_score_for_random_latent_noise = 0.
-        samples, generated_samples, generated_labels = None, None, None
+        numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
+
+        min_mse_score_for_fixed_latent_noise_and_confidence = float('inf')
+        min_mse_score_for_random_latent_noise_and_confidence = float('inf')
+        samples, generated_samples, generated_confidence_scores = None, None, None
 
         d_loss_hist, g_loss_hist = list(), list()
 
@@ -157,22 +137,21 @@ class GANBBModel:
             # enumerate batches manually
             for batch_num in range(batches_per_epoch):
                 # generate 'fake' samples
-                X_fake, confidence_scores_input = self.generate_fake_samples(batch_size)
+                generated_samples, confidence_scores_input = self.generate_fake_samples(batch_size)
 
-                # todo change to predict_proba - take only positive confidence
                 # get BB model output for the current generated samples
-                y_outputs = self.bb_model.predict(X_fake)
+                y_outputs = self.bb_model.predict_proba(generated_samples)[:, 1]
 
                 # generate class labels
                 y = randint(0, 2, batch_size)
                 for i in range(batch_size):
-                    if y == 0:
+                    if y[i] == 0:
                         temp = confidence_scores_input[i]
                         confidence_scores_input[i] = y_outputs[i]
                         y_outputs[i] = temp
 
                 # update discriminator model weights
-                d_loss = self.discriminator.train_on_batch([X_fake, confidence_scores_input, y_outputs], y)
+                d_loss = self.discriminator.train_on_batch([generated_samples, confidence_scores_input, y_outputs], y)
 
                 # prepare points in latent space as input for the generator
                 z_input, confidence_scores = self.generate_latent_points(batch_size)
@@ -181,45 +160,63 @@ class GANBBModel:
                 y_gan = np.zeros((batch_size, 1))
 
                 # update the generator via the discriminator's error
-                g_loss = self.gan.train_on_batch([z_input, confidence_scores_input], y_gan)
+                with tf.GradientTape() as tape:
+                    # Generate samples using the generator
+                    generated_samples = self.generator([z_input, confidence_scores], training=True)
+                    # get BB model output for the current generated samples
+                    y_outputs = self.bb_model.predict_proba(generated_samples)[:, 1]
+                    # Get the discriminator result
+                    critic_result = self.discriminator([generated_samples, confidence_scores, y_outputs], training=True)
+                    # Calculate the generator loss
+                    g_loss = self.generator_loss_fn(y_gan, critic_result)
+
+                # Get the gradients w.r.t the generator loss
+                gen_gradient = tape.gradient(g_loss, self.generator.trainable_variables)
+                # Update the weights of the generator using the generator optimizer
+                self.generator_optimizer.apply_gradients(zip(gen_gradient, self.generator.trainable_variables))
 
                 g_loss_epoch.append(g_loss)
                 d_loss_epoch.append(d_loss)
-                # todo aggregate all mse between y_outputs and positive confidence
 
-            # store loss & accuracy
+            # store loss
             g_loss_hist.append(np.mean(g_loss_epoch))
             d_loss_hist.append(np.mean(d_loss_epoch))
-            # todo mean for all y_outputs and positive confidence aggregation and aggregate per epoch
+
             # logging
             logger.info("epoch {} discriminator - d_loss: {}, generator - g_loss: {}".format(epoch,
                                                                                              d_loss_hist[-1],
                                                                                              g_loss_hist[-1]))
 
             # # summarize performance
-            # samples_fixed_latent_noise, generated_samples_fixed_latent_noise, labels_fixed_latent_noise = gan_sample_generator.generate_samples(self.generator)
-            # samples_random_latent_noise, generated_samples_random_latent_noise, labels_random_latent_noise = gan_sample_generator.generate_samples(self.generator, random_latent_noise=True)
-            #
-            # # evaluate using machine learning efficacy
-            # score_for_fixed_latent_noise = evaluate_machine_learning_efficacy(generated_samples_fixed_latent_noise, labels_fixed_latent_noise, X_test, y_test)
-            # score_for_random_latent_noise = evaluate_machine_learning_efficacy(generated_samples_random_latent_noise, labels_random_latent_noise, X_test, y_test)
-            #
-            # logger.info("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
-            #                                                                                                 score_for_fixed_latent_noise,
-            #                                                                                                 score_for_random_latent_noise))
-            #
-            # if score_for_fixed_latent_noise > max_score_for_fixed_latent_noise:
-            #     max_score_for_fixed_latent_noise = score_for_fixed_latent_noise
-            #     samples = samples_fixed_latent_noise
-            #     generated_samples = generated_samples_fixed_latent_noise
-            #     generated_labels = labels_fixed_latent_noise
-            #
-            #     # save models
-            #     self.generator.save(f"{experiment_dir}/generator.h5")
-            #     self.discriminator.save(f"{experiment_dir}/critic.h5")
-            #     self.gan.save(f"{experiment_dir}/gan.h5")
-            #
-            # if score_for_random_latent_noise > max_score_for_random_latent_noise:
-            #     max_score_for_random_latent_noise = score_for_random_latent_noise
+            samples_fixed_latent_noise, generated_samples_fixed_latent_noise, fixed_confidence_scores = gan_sample_generator.generate_samples(self.generator)
+            samples_random_latent_noise, generated_samples_random_latent_noise, random_confidence_scores = gan_sample_generator.generate_samples(self.generator, random_latent_noise_and_confidence_scores=True)
 
-        return d_loss_hist, g_loss_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, generated_labels
+            # evaluate using MSE metric between black box model outputs and confidence scores
+            score_for_fixed_latent_noise_and_confidence = tf.keras.losses.MeanSquaredError()(self.bb_model.predict_proba(generated_samples_fixed_latent_noise)[:, 1], fixed_confidence_scores)
+            score_for_random_latent_noise_and_confidence = tf.keras.losses.MeanSquaredError()(self.bb_model.predict_proba(generated_samples_random_latent_noise)[:, 1], random_confidence_scores)
+
+            logger.info(
+                "epoch {} MSE score for fixed latent noise and confidence scores: {}, random latent noise and random confidence scores: {}".format(
+                    epoch,
+                    score_for_fixed_latent_noise_and_confidence,
+                    score_for_random_latent_noise_and_confidence))
+
+            if score_for_fixed_latent_noise_and_confidence < min_mse_score_for_fixed_latent_noise_and_confidence:
+                min_mse_score_for_fixed_latent_noise_and_confidence = score_for_fixed_latent_noise_and_confidence
+                samples = samples_fixed_latent_noise
+                generated_samples = generated_samples_fixed_latent_noise
+                generated_confidence_scores = fixed_confidence_scores
+
+                # save models
+                self.generator.save(f"{experiment_dir}/generator.h5")
+                self.discriminator.save(f"{experiment_dir}/critic.h5")
+
+                # evaluate diversity using tsne
+                evaluate_using_tsne(samples_fixed_latent_noise, np.zeros((fake_dataset_size, 1)), df_real_not_normalized.columns.tolist(), categorical_columns.tolist(), epoch,
+                                    experiment_dir)
+
+            if score_for_random_latent_noise_and_confidence < min_mse_score_for_random_latent_noise_and_confidence:
+                min_mse_score_for_random_latent_noise_and_confidence = score_for_random_latent_noise_and_confidence
+
+        return d_loss_hist, g_loss_hist, min_mse_score_for_fixed_latent_noise_and_confidence,\
+               min_mse_score_for_random_latent_noise_and_confidence, samples, generated_samples, generated_confidence_scores

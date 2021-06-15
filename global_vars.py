@@ -1,17 +1,15 @@
 import os
 
+MODELS = ['cgan', 'cwgan', 'gan_with_twist']
 MAIN_DATA_DIR = 'Data'
 DIABETES_PATH = os.sep.join([MAIN_DATA_DIR, 'diabetes.arff'])
 GERMAN_CREDIT_PATH = os.sep.join([MAIN_DATA_DIR, 'german_credit.arff'])
 
-TF_LOGS_PATH = os.sep.join([os.curdir, 'tf_logs'])
-
 MAIN_MODELS_DIR = 'models'
 
-OVERWRITE_RFC_FILE = False
+PERFORM_GRID_SERACH = False
 DATASET = 'diabetes'
-GAN_MODE = 'cgan'
-SECTION = "section1"
+GAN_MODE = MODELS[2]
 
 SEED = 42
 BATCH_SIZE = 64
@@ -22,4 +20,5 @@ CRITIC_LR = 0.00002
 CRITIC_DROPOUT = 0.2
 CRITIC_STEPS = 3
 IS_LABEL_CONDITIONAL = True
-NUM_OF_RANDOM_SAMPLES = 100
+NUM_OF_RANDOM_SAMPLES_PART1 = 100
+NUM_OF_RANDOM_SAMPLES_PART2 = 1000

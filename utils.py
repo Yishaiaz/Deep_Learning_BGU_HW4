@@ -45,7 +45,7 @@ def log(path, file):
     return logger
 
 
-def plot_critic_generator_loss(x1: List, y1: List, x2: List, y2: List, label1: str, label2: str, x_axis: str, y_axis: str, title: str):
+def plot_critic_generator_loss(x1: List, y1: List, x2: List, y2: List, label1: str, label2: str, x_axis: str, y_axis: str, title: str, experiment_dir):
     # plotting the line 1 points
     plt.plot(x1, y1, label=label1)
     # plotting the line 2 points
@@ -57,8 +57,9 @@ def plot_critic_generator_loss(x1: List, y1: List, x2: List, y2: List, label1: s
     plt.title(title)
     # show a legend on the plot
     plt.legend()
-    # Display a figure.
-    plt.show()
+    # save a figure.
+    plt.savefig(f'{experiment_dir}/loss_plot.png')
+    plt.close()
 
 
 def plot_critic_accuracy(x: List, y: List, label1: str, x_axis: str, y_axis: str, title: str):
@@ -273,3 +274,79 @@ class GanSampleGenerator:
             samples.append(sample)
 
         return samples, generated_samples, labels
+
+
+class GanWithTwistSampleGenerator:
+    def __init__(self,
+                 latent_noise_size: int,
+                 column_idx_to_scaler: dict,
+                 column_idx_to_ohe: dict,
+                 columns_size: List[int],
+                 num_samples: int = 1,
+                 evaluation_mode: bool = False):
+
+        self.columns_size = columns_size
+        self.evaluation_mode = evaluation_mode
+        self.num_samples = num_samples
+        self.column_idx_to_ohe = column_idx_to_ohe
+        self.column_idx_to_scaler = column_idx_to_scaler
+        self.latent_noise_size = latent_noise_size
+        self.z_input = None
+
+        if self.evaluation_mode:
+            # sample random noise latent vectors
+            self.z_input = tf.random.truncated_normal(shape=[self.latent_noise_size * self.num_samples]).numpy()
+            # reshape into a batch of inputs for the network
+            self.z_input = self.z_input.reshape(self.num_samples, self.latent_noise_size)
+
+            # sample confidence scores
+            self.confidence_scores = np.random.uniform(size=self.num_samples)
+
+    def generate_samples(self, generator, random_latent_noise_and_confidence_scores: bool = False):
+        if not random_latent_noise_and_confidence_scores and self.evaluation_mode:
+            z_input = self.z_input
+            confidence_scores = self.confidence_scores
+        else:
+            # sample random noise latent vectors
+            z_input = tf.random.truncated_normal(shape=[self.latent_noise_size * self.num_samples]).numpy()
+            # reshape into a batch of inputs for the network
+            z_input = z_input.reshape(self.num_samples, self.latent_noise_size)
+
+            # sample confidence scores
+            confidence_scores = np.random.uniform(size=self.num_samples)
+
+        # generate samples using generator model
+        generated_samples = generator.predict([z_input, confidence_scores])
+
+        generated_samples = generated_samples.tolist()
+
+        # convert raw generated samples' representation into original format
+        samples = []
+        for generated_sample in generated_samples:
+            sample = []
+            column_idx = 0
+            column_size_idx = len(self.column_idx_to_scaler)
+
+            for sample_col_value in generated_sample:
+                if column_idx in self.column_idx_to_scaler.keys():  # inverse transform min-max scaler
+                    sample.append(self.column_idx_to_scaler[column_idx].inverse_transform(np.array([[sample_col_value]]))[0][0])
+                else:  # inverse transform one-hot-encoding format
+                    if column_idx not in self.column_idx_to_ohe.keys():
+                        column_idx += 1
+                        continue
+
+                    categorical_softmax_representation = generated_sample[column_idx:column_idx + self.columns_size[column_size_idx]]
+                    # find index with the max value and generate one-hot-encoding representation
+                    max_index = np.argmax(np.array(categorical_softmax_representation))
+                    categorical_ohe_representation = [0] * self.columns_size[column_size_idx]
+                    categorical_ohe_representation[max_index] = 1
+                    categorical_value = self.column_idx_to_ohe[column_idx].inverse_transform([categorical_ohe_representation])[0][0]
+
+                    sample.append(categorical_value)
+                    column_size_idx += 1
+
+                column_idx += 1
+
+            samples.append(sample)
+
+        return samples, generated_samples, confidence_scores
