@@ -192,84 +192,61 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
                        clf: SimpleCLFForEvaluation,
                        labels_to_num_dict: dict,
                        experiment_dir: str = '',
-                       number_of_bins: int = 5):
+                       number_of_bins: int = 5,
+                       proba_idx_to_measure: int = 1):
     probas_dist = clf.model_confidence_score_distribution(X_generated)
     dist_by_class = {}
-    order_of_classes, n_classes = {position: class_value  for position, class_value in enumerate(clf.model.classes_)}, \
+    order_of_classes, n_classes = {position: class_value for position, class_value in enumerate(clf.model.classes_)}, \
                                   len(clf.model.classes_)
 
     bins = np.linspace(0, 1, number_of_bins + 1)
     bins_absolute_errors = [[] for i in range(number_of_bins)]
-    wrong_class_absolute_errors = [[] for i in range(number_of_bins)]
-    inverse_labels_to_nam_dict = invert_labels_to_num_dict(labels_to_num_dict)
+    absolute_errors_between_confidences = []
+    inverse_labels_to_num_dict = invert_labels_to_num_dict(labels_to_num_dict)
 
     for pos, class_val in order_of_classes.items():
         dist_by_class[class_val] = []
-    # todo: choose one bucket to draw info from ([0,1] from the confidences)
+
     for row_idx, confidences_of_model in enumerate(probas_dist):
-        class_predicted = order_of_classes[np.argmax(confidences_of_model)]
-        confidence_of_predicted_class = confidences_of_model[np.argmax(confidences_of_model)]
-        confidence_of_wrong_predicted_class = confidences_of_model[np.argmin(confidences_of_model)]
+        confidence_of_predicted_class = confidences_of_model[proba_idx_to_measure]
         bin_idx_of_pred_confidence = np.digitize(confidence_of_predicted_class,
                                                  bins=bins) - 1 if confidence_of_predicted_class < 1 else number_of_bins - 1
-        bin_idx_of_wrong_pred_confidence = np.digitize(confidence_of_wrong_predicted_class,
-                                                       bins=bins) - 1 if confidence_of_wrong_predicted_class < 1 else number_of_bins - 1
 
         confidence_given_to_gan = confidence_scores[row_idx]
+        absolute_confidence_error = np.abs(confidence_of_predicted_class - confidence_given_to_gan)
+        absolute_errors_between_confidences += [absolute_confidence_error]
+        bins_absolute_errors[bin_idx_of_pred_confidence] += [absolute_confidence_error]
 
-        bins_absolute_errors[bin_idx_of_pred_confidence] += [np.abs(confidence_of_predicted_class - confidence_given_to_gan)]
-        wrong_class_absolute_errors[bin_idx_of_wrong_pred_confidence] += [np.abs(confidence_of_wrong_predicted_class - confidence_given_to_gan)]
 
-        dist_by_class[class_predicted] += [[confidence_of_predicted_class, confidence_given_to_gan]]
+    # plot confidences absolute error
+    fig, ax = plt.subplots()
+    ax.scatter(np.arange(0, len(absolute_errors_between_confidences), 1), absolute_errors_between_confidences)
 
-    fig, axis = plt.subplots((n_classes))
-    # plot confidences of each class
-    for idx, class_value in enumerate(order_of_classes.values()):
-        confidence_vals = np.asarray(dist_by_class[class_value])
-        abs_error_between_confidence = np.abs(confidence_vals[:, 0] - confidence_vals[:, 1])
-
-        axis[idx].plot(np.arange(0, len(abs_error_between_confidence), 1), abs_error_between_confidence)
-
-        axis[idx].set(ylim=(0, 1))
-        class_label = inverse_labels_to_nam_dict[class_value]
-        axis[idx].set_title(f'Predicted Class={class_label}')
-
-    fig.suptitle('Absolute Error between confidence\nof GAN and BB prediction confidence')
+    ax.set_ylim((0, 1))
+    fig.suptitle(f'Absolute Error between confidence of class {order_of_classes[proba_idx_to_measure]}\nof BB prediction GAN and confidence')
     plt.tight_layout()
-    plt.legend()
-    fig_path = os.sep.join([experiment_dir, 'absolute_error_of_confidence.png'])
+    fig_path = os.sep.join([experiment_dir, f'absolute_error_of_confidence_class{order_of_classes[proba_idx_to_measure]}.png'])
     plt.savefig(fig_path)
+
     bins_mse = np.zeros(shape=(len(bins_absolute_errors), ))
-    bins_wrong_mse = np.zeros(shape=(len(wrong_class_absolute_errors), ))
+
     for bin_idx, bin_absolute_errors in enumerate(bins_absolute_errors):
         bins_mse[bin_idx] = np.mean(bin_absolute_errors) if len(bin_absolute_errors) > 0 else 0
-        wrong_bin_absolute_error = wrong_class_absolute_errors[bin_idx]
-        bins_wrong_mse[bin_idx] = np.mean(wrong_bin_absolute_error) if len(wrong_bin_absolute_error) > 0 else 0
 
     fig, ax = plt.subplots()
     ax.bar(range(len(bins_mse)), bins_mse, label='MSE: Confidence of prediction', fc=(1, 0, 1, 0.6))
-    ax.bar(range(len(bins_wrong_mse)), bins_wrong_mse, label='MSE: Confidence of wrong prediction', fc=(0, 1, 0, 0.4))
+
+    ax.set_xlabel(f'confidence for class {order_of_classes[proba_idx_to_measure]}')
+    ax.set_ylabel('MSE for confidence given to GAN & scored by BB')
     ax.set_xticks(range(len(bins_mse)))
     ax.set_xticklabels([f'{bins[i]:.2f}-{bins[i+1]:.2f}' for i in range(len(bins)-1)])
     ax.set_ylim((0, 1))
     fig.suptitle('Mean Absolute Error between confidence\nof GAN and BB prediction confidence')
     plt.tight_layout()
-    plt.legend()
-    fig_path = os.sep.join([experiment_dir, 'mean_absolute_error_of_confidences.png'])
+    # plt.legend()
+    fig_path = os.sep.join([experiment_dir, f'mean_absolute_error_of_confidences_class_{order_of_classes[proba_idx_to_measure]}.png'])
     plt.savefig(fig_path)
 
-    fig, ax = plt.subplots()
-    ax.hist(probas_dist[:, 0], edgecolor='black', label=f'{inverse_labels_to_nam_dict[order_of_classes[0]]}',
-            fc=(1, 1, 0, 0.5))
-    ax.hist(probas_dist[:, 1], edgecolor='black', label=f'{inverse_labels_to_nam_dict[order_of_classes[1]]}',
-            fc=(1, 0, 1, 0.5))
-    ax.set_title('All Confidence Scores of BB Model')
-    plt.tight_layout()
-    plt.legend()
-    fig_path = os.sep.join([experiment_dir, 'confidence_scores_about_classes.png'])
-    plt.savefig(fig_path)
-
-    # calc which confidence intervals had lower MAE
 
 
 def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size, columns_size, column_idx_to_scaler, column_idx_to_ohe, num_samples,
@@ -331,7 +308,11 @@ def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size
     samples_reduced = np.array(samples)[:num_of_random_samples, :]
 
     part_2_section_4_c(generated_samples_reduced, generated_confidence_scores_reduced, clf=random_forest_model, labels_to_num_dict=labels_to_num_dict,
-                       experiment_dir=experiment_dir)
+                       experiment_dir=experiment_dir, proba_idx_to_measure=0)
+
+    part_2_section_4_c(generated_samples_reduced, generated_confidence_scores_reduced, clf=random_forest_model,
+                       labels_to_num_dict=labels_to_num_dict,
+                       experiment_dir=experiment_dir, proba_idx_to_measure=1)
 
 
 def classifier_evaluation(labels_to_num_dict: dict,
