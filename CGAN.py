@@ -54,10 +54,10 @@ class CGAN:
         else:
             input_in = sample_input
 
-        x = Dense(128, activation=self._discriminator_activation_function)(input_in)
+        x = Dense(256, activation=self._discriminator_activation_function)(input_in)
         x = BatchNormalization()(x)
         x = Dropout(self._discriminator_dropout)(x)
-        x = Dense(128, activation=self._discriminator_activation_function)(x)
+        x = Dense(256, activation=self._discriminator_activation_function)(x)
         x = BatchNormalization()(x)
         x = Dropout(self._discriminator_dropout)(x)
         output = Dense(1, activation='sigmoid')(x)
@@ -169,8 +169,9 @@ class CGAN:
         max_score_for_fixed_latent_noise = 0.
         max_score_for_random_latent_noise = 0.
         samples, generated_samples, generated_labels = None, None, None
+        best_epoch = 0
 
-        d_loss1_hist, d_loss2_hist, g_loss_hist, d_acc1_hist, d_acc2_hist = list(), list(), list(), list(), list()
+        d_loss1_hist, d_loss2_hist, g_loss_hist, d_acc1_hist, d_acc2_hist, score_for_fixed_latent_noise_hist, score_for_random_latent_noise_hist = list(), list(), list(), list(), list(), list(), list()
 
         for epoch in range(n_epochs):
             d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch = list(), list(), list(), list(), list()
@@ -236,26 +237,36 @@ class CGAN:
             score_for_fixed_latent_noise = evaluate_machine_learning_efficacy(generated_samples_fixed_latent_noise, labels_fixed_latent_noise, X_test, y_test)
             score_for_random_latent_noise = evaluate_machine_learning_efficacy(generated_samples_random_latent_noise, labels_random_latent_noise, X_test, y_test)
 
-            logger.info("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
-                                                                                                            score_for_fixed_latent_noise,
-                                                                                                            score_for_random_latent_noise))
+            logger.info("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}, best score(epoch={}): {}".format(
+                epoch,
+                score_for_fixed_latent_noise,
+                score_for_random_latent_noise,
+                best_epoch,
+                max_score_for_fixed_latent_noise))
+
+            score_for_fixed_latent_noise_hist.append(score_for_fixed_latent_noise)
+            score_for_random_latent_noise_hist.append(score_for_random_latent_noise)
 
             if score_for_fixed_latent_noise > max_score_for_fixed_latent_noise:
                 max_score_for_fixed_latent_noise = score_for_fixed_latent_noise
                 samples = samples_fixed_latent_noise
                 generated_samples = generated_samples_fixed_latent_noise
                 generated_labels = labels_fixed_latent_noise
+                best_epoch = epoch
 
                 # save models
                 self.generator.save(f"{experiment_dir}/generator.h5")
                 self.discriminator.save(f"{experiment_dir}/critic.h5")
                 self.gan.save(f"{experiment_dir}/gan.h5")
 
-                # evaluate using tsne
-                evaluate_using_tsne(samples_fixed_latent_noise, generated_labels, df_real_not_normalized.columns.tolist(), categorical_columns.tolist(), epoch, experiment_dir)
-
             if score_for_random_latent_noise > max_score_for_random_latent_noise:
                 max_score_for_random_latent_noise = score_for_random_latent_noise
 
+        # evaluate using tsne
+        evaluate_using_tsne(samples, generated_labels,
+                            df_real_not_normalized.columns.tolist(), categorical_columns.tolist(), best_epoch,
+                            experiment_dir)
+
         return d_loss1_hist, d_loss2_hist, g_loss_hist, d_acc1_hist,  d_acc2_hist,\
-               max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, generated_labels
+               max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, generated_labels, \
+               score_for_fixed_latent_noise_hist, score_for_random_latent_noise_hist

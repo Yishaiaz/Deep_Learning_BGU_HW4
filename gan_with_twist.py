@@ -53,10 +53,10 @@ class GANBBModel:
 
         input_in = Concatenate()([sample_input, in_confidence_score, in_y])
 
-        x = Dense(128, activation=self._discriminator_activation_function)(input_in)
+        x = Dense(256, activation=self._discriminator_activation_function)(input_in)
         x = BatchNormalization()(x)
         x = Dropout(self._discriminator_dropout)(x)
-        x = Dense(128, activation=self._discriminator_activation_function)(x)
+        x = Dense(256, activation=self._discriminator_activation_function)(x)
         x = BatchNormalization()(x)
         x = Dropout(self._discriminator_dropout)(x)
         output = Dense(1)(x)
@@ -124,9 +124,10 @@ class GANBBModel:
 
         min_mse_score_for_fixed_latent_noise_and_confidence = float('inf')
         min_mse_score_for_random_latent_noise_and_confidence = float('inf')
+        best_epoch = 0
         samples, generated_samples, generated_confidence_scores = None, None, None
 
-        d_loss_hist, g_loss_hist = list(), list()
+        d_loss_hist, g_loss_hist, score_for_fixed_latent_noise_and_confidence_hist, score_for_random_latent_noise_and_confidence_hist = list(), list(), list(), list()
 
         # calculate the number of batches per training epoch
         batches_per_epoch = int(fake_dataset_size / batch_size)
@@ -196,27 +197,36 @@ class GANBBModel:
             score_for_random_latent_noise_and_confidence = tf.keras.losses.MeanSquaredError()(self.bb_model.predict_proba(generated_samples_random_latent_noise)[:, 1], random_confidence_scores)
 
             logger.info(
-                "epoch {} MSE score for fixed latent noise and confidence scores: {}, random latent noise and random confidence scores: {}".format(
+                "epoch {} MSE score for fixed latent noise and confidence scores: {}, random latent noise and random confidence scores: {}, best score(epoch={}): {}".format(
                     epoch,
                     score_for_fixed_latent_noise_and_confidence,
-                    score_for_random_latent_noise_and_confidence))
+                    score_for_random_latent_noise_and_confidence,
+                    best_epoch,
+                    min_mse_score_for_fixed_latent_noise_and_confidence))
+
+            score_for_fixed_latent_noise_and_confidence_hist.append(score_for_fixed_latent_noise_and_confidence)
+            score_for_random_latent_noise_and_confidence_hist.append(score_for_random_latent_noise_and_confidence)
 
             if score_for_fixed_latent_noise_and_confidence < min_mse_score_for_fixed_latent_noise_and_confidence:
                 min_mse_score_for_fixed_latent_noise_and_confidence = score_for_fixed_latent_noise_and_confidence
                 samples = samples_fixed_latent_noise
                 generated_samples = generated_samples_fixed_latent_noise
                 generated_confidence_scores = fixed_confidence_scores
+                best_epoch = epoch
 
                 # save models
                 self.generator.save(f"{experiment_dir}/generator.h5")
                 self.discriminator.save(f"{experiment_dir}/critic.h5")
 
-                # evaluate diversity using tsne
-                evaluate_using_tsne(samples_fixed_latent_noise, np.zeros((fake_dataset_size, 1)), df_real_not_normalized.columns.tolist(), categorical_columns.tolist(), epoch,
-                                    experiment_dir)
-
             if score_for_random_latent_noise_and_confidence < min_mse_score_for_random_latent_noise_and_confidence:
                 min_mse_score_for_random_latent_noise_and_confidence = score_for_random_latent_noise_and_confidence
 
+        # evaluate diversity using tsne
+        evaluate_using_tsne(samples, np.zeros((fake_dataset_size, 1)),
+                            df_real_not_normalized.columns.tolist(), categorical_columns.tolist(),
+                            best_epoch,
+                            experiment_dir)
+
         return d_loss_hist, g_loss_hist, min_mse_score_for_fixed_latent_noise_and_confidence,\
-               min_mse_score_for_random_latent_noise_and_confidence, samples, generated_samples, generated_confidence_scores
+               min_mse_score_for_random_latent_noise_and_confidence, samples, generated_samples, generated_confidence_scores,\
+               score_for_fixed_latent_noise_and_confidence_hist, score_for_random_latent_noise_and_confidence_hist

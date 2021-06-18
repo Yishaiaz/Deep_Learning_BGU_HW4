@@ -8,10 +8,12 @@ from CGAN import CGAN
 from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from gan_with_twist import GANBBModel
+from gan_with_twist_binary_cross_entropy import GANBBModelBinaryCE
 from random_forest_model import *
 from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, \
     model_confidence_score_distribution, generate_and_draw_boxplots, \
-    real_to_generated_distance, invert_labels_to_num_dict, GanWithTwistSampleGenerator, plot_critic_generator_loss
+    real_to_generated_distance, invert_labels_to_num_dict, GanWithTwistSampleGenerator, plot_critic_generator_loss, \
+    plot_score_metrics
 
 np_config.enable_numpy_behavior()
 
@@ -57,7 +59,8 @@ def part1_section3(generator, critic, num_of_random_samples, experiment_dir, gan
     # distances between real and fake
     column_correlation, euclidean_distance = real_to_generated_distance(real_df=df_real_not_normalized,
                                                                         fake_df=df_fake.iloc[:, :-1],
-                                                                        categorical_columns=categorical_columns)
+                                                                        categorical_columns=categorical_columns,
+                                                                        numeric_columns=numeric_columns)
 
     return accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, column_correlation, euclidean_distance
 
@@ -79,14 +82,15 @@ def train_cgan_and_generate_statistics(ds, df_real, input_size, columns_size, nu
                                               evaluation_mode=True,
                                               positive_negative_labels=positive_negative_labels)
     d_loss1_epoch, d_loss2_epoch, g_loss_epoch, d_acc1_epoch, d_acc2_epoch, max_score_for_fixed_latent_noise, \
-    max_score_for_random_latent_noise, samples, generated_samples, labels = cgan.train(ds,
-                                                                                       BATCH_SIZE,
-                                                                                       gan_sample_generator,
-                                                                                       X_test, y_test,
-                                                                                       N_EPOCHS,
-                                                                                       df_real_not_normalized.iloc[:, :-1],
-                                                                                       experiment_dir,
-                                                                                       logger)
+    max_score_for_random_latent_noise, samples, generated_samples, labels, score_for_fixed_latent_noise_hist, score_for_random_latent_noise_hist = cgan.train(
+        ds,
+        BATCH_SIZE,
+        gan_sample_generator,
+        X_test, y_test,
+        N_EPOCHS,
+        df_real_not_normalized.iloc[:, :-1],
+        experiment_dir,
+        logger)
 
     # table evaluation
     target_column_name = df_real.columns[-1]
@@ -105,6 +109,10 @@ def train_cgan_and_generate_statistics(ds, df_real, input_size, columns_size, nu
 
     # line plots of accuracy
     plot_accuracy_history(d_acc1_epoch, d_acc2_epoch, experiment_dir)
+
+    # line plot of scores
+    plot_score_metrics(list(range(1, len(score_for_fixed_latent_noise_hist) + 1)), score_for_fixed_latent_noise_hist,
+                       list(range(1, len(score_for_random_latent_noise_hist) + 1)), score_for_random_latent_noise_hist, "fixed latent noise", "random latent noise", "epoch", "score", "ML_efficacy_scores", experiment_dir)
 
     logger.info("")
     logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
@@ -145,7 +153,8 @@ def train_cwgan_and_generate_statistics(X, y, df_real, input_size, columns_size,
                                               num_positive_negative_classes=num_positive_negative_classes,
                                               evaluation_mode=True,
                                               positive_negative_labels=positive_negative_labels)
-    c_loss1_hist, c_loss2_hist, g_loss_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, labels = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
+    c_loss1_hist, c_loss2_hist, g_loss_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise,\
+    samples, generated_samples, labels, score_for_fixed_latent_noise_hist, score_for_random_latent_noise_hist = gan.train(X.to_numpy(), y.to_numpy(), BATCH_SIZE, gan_sample_generator,
         X_test, y_test, N_EPOCHS, df_real_not_normalized.iloc[:, :-1], experiment_dir, logger)
 
     # table evaluation
@@ -164,28 +173,15 @@ def train_cwgan_and_generate_statistics(X, y, df_real, input_size, columns_size,
     # line plots of loss
     plot_loss_history(c_loss1_hist, c_loss2_hist, g_loss_hist, experiment_dir)
 
+    # line plot of scores
+    plot_score_metrics(list(range(1, len(score_for_fixed_latent_noise_hist) + 1)), score_for_fixed_latent_noise_hist,
+                       list(range(1, len(score_for_random_latent_noise_hist) + 1)), score_for_random_latent_noise_hist, "fixed latent noise", "random latent noise", "epoch", "score", "ML_efficacy_scores", experiment_dir)
+
     logger.info("")
     logger.info("Best ML efficacy score fixed latent noise: {}, random latent noise: {}".format(
         max_score_for_fixed_latent_noise,
         max_score_for_random_latent_noise))
     logger.info("")
-
-    # TODO
-    # # load models
-    # generator = load_model(f"{experiment_dir}/generator.h5")
-    # critic = load_model(f"{experiment_dir}/critic.h5", custom_objects={'ClipConstraint': ClipConstraint, 'wasserstein_loss': wasserstein_loss})
-    #
-    # # part 1 section 3
-    # accuracy, samples_that_fooled_the_critic, samples_that_not_fooled_the_critic, \
-    # column_correlation, euclidean_distance = part1_section3(generator, critic, NUM_OF_RANDOM_SAMPLES_PART1, experiment_dir,
-    #                                                         gan_sample_generator, df_fake, df_real_not_normalized)
-    #
-    # logger.info("")
-    # logger.info("100 random generated samples were able to achieve {} accuracy".format(accuracy))
-    # logger.info("Samples that fooled the critic: {}".format(samples_that_fooled_the_critic))
-    # logger.info("Samples that not fooled the critic: {}".format(samples_that_not_fooled_the_critic))
-    # logger.info("Column correlation between fake and real data: {}".format(column_correlation))
-    # logger.info("Euclidean distance between fake and real data: {}".format(euclidean_distance))
 
 
 def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
@@ -256,7 +252,10 @@ def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size
     # Gather numeric and categorical columns into a list
     numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized.iloc[:, :-1])
 
-    gan_bb_model = GANBBModel(random_forest_model.model, input_size, columns_size)
+    if GANBBMODEL_OBJECTIVE_FUNCTION == 'binary_crossentropy':
+        gan_bb_model = GANBBModelBinaryCE(random_forest_model.model, input_size, columns_size)
+    else:
+        gan_bb_model = GANBBModel(random_forest_model.model, input_size, columns_size)
     gan_sample_generator = GanWithTwistSampleGenerator(LATENT_NOISE_SIZE,
                                                        column_idx_to_scaler,
                                                        column_idx_to_ohe,
@@ -264,7 +263,8 @@ def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size
                                                        num_samples,
                                                        evaluation_mode=True)
     d_loss_epoch, g_loss_epoch, min_mse_score_for_fixed_latent_noise_and_confidence, \
-    min_mse_score_for_random_latent_noise_and_confidence, samples, generated_samples, generated_confidence_scores = gan_bb_model.train(
+    min_mse_score_for_random_latent_noise_and_confidence, samples, generated_samples, generated_confidence_scores, \
+    score_for_fixed_latent_noise_and_confidence_hist, score_for_random_latent_noise_and_confidence_hist = gan_bb_model.train(
         num_samples,
         BATCH_SIZE,
         gan_sample_generator,
@@ -288,6 +288,10 @@ def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size
     # line plots of loss
     plot_critic_generator_loss(list(range(1, len(d_loss_epoch) + 1)), d_loss_epoch, list(range(1, len(g_loss_epoch) + 1)), g_loss_epoch,
                                "critic loss", "generator loss", "epoch #", "loss", "Discriminator and Generator loss values per epoch", experiment_dir)
+
+    # line plot of scores
+    plot_score_metrics(list(range(1, len(score_for_fixed_latent_noise_and_confidence_hist) + 1)), score_for_fixed_latent_noise_and_confidence_hist,
+                       list(range(1, len(score_for_random_latent_noise_and_confidence_hist) + 1)), score_for_random_latent_noise_and_confidence_hist, "fixed latent noise", "random latent noise", "epoch", "score", "MSE_pred_c", experiment_dir)
 
     logger.info("")
     logger.info("Best MSE score fixed latent noise and confidence scores: {}, random latent noise and random confidence scores: {}".format(
@@ -403,6 +407,9 @@ def main():
         LATENT_NOISE_SIZE,
         SEED)
 
+    if GAN_MODE == "gan_with_twist":
+        experiment_name += "objective={}".format(GANBBMODEL_OBJECTIVE_FUNCTION)
+
     section = "section2" if GAN_MODE == "gan_with_twist" else "section1"
     experiment_dir = os.sep.join([DATASET, section, experiment_name])
     if not os.path.exists(experiment_dir):
@@ -450,8 +457,8 @@ if __name__ == '__main__':
         global CRITIC_DROPOUT
 
         # run grid search
-        batch_sizes = [64, 128]
-        n_epochs = [100, 500]
+        batch_sizes = [16, 32]
+        n_epochs = [200]
         generator_lr = [0.0005, 0.00005, 0.000005]
         critic_lr = [0.0005, 0.00005, 0.000005]
         critic_dropout = [0.2, 0.5]

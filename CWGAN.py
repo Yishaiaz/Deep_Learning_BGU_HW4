@@ -85,13 +85,13 @@ class CWGAN:
 
         weights_constraint = ClipConstraint(0.01)
 
-        x = Dense(128, activation=self._critic_activation_function, kernel_constraint=weights_constraint)(input_in)
+        x = Dense(256, activation=self._critic_activation_function, kernel_constraint=weights_constraint)(input_in)
         x = BatchNormalization()(x)
         x = Dropout(self._critic_dropout)(x)
-        x = Dense(128, activation=self._critic_activation_function, kernel_constraint=weights_constraint)(x)
+        x = Dense(256, activation=self._critic_activation_function, kernel_constraint=weights_constraint)(x)
         x = BatchNormalization()(x)
         x = Dropout(self._critic_dropout)(x)
-        output = Dense(1, kernel_constraint=weights_constraint)(x)
+        output = Dense(1)(x)
 
         if self._is_label_conditional:
             critic = Model([sample_input, in_label], output)
@@ -216,11 +216,12 @@ class CWGAN:
         # calculate the size of half a batch of samples
         half_batch = int(batch_size / 2)
         # lists for keeping track of loss
-        c1_hist, c2_hist, g_hist = list(), list(), list()
+        c1_epoch_hist, c2_epoch_hist, g_epoch_hist, c1_hist, c2_hist, g_hist, score_for_fixed_latent_noise_hist, score_for_random_latent_noise_hist = list(), list(), list(), list(), list(), list(), list(), list()
 
         max_score_for_fixed_latent_noise = 0.
         max_score_for_random_latent_noise = 0.
         samples, generated_samples, generated_labels = None, None, None
+        best_epoch = 0
 
         # manually enumerate epochs
         epoch = 1
@@ -259,11 +260,21 @@ class CWGAN:
                 g_loss = self.gan.train_on_batch(z_input, y_gan)
             g_hist.append(g_loss)
 
-            # summarize loss on this batch
-            logger.info("step {} critic - c_loss1: {} - c_loss2: {}, generator - g_loss: {}".format(i + 1, c1_hist[-1], c2_hist[-1], g_loss))
-
             # evaluate the model performance every 'epoch'
             if (i + 1) % batches_per_epoch == 0:
+                c1_epoch_hist.append(mean(c1_hist))
+                c2_epoch_hist.append(mean(c2_hist))
+                g_epoch_hist.append(mean(g_hist))
+
+                # summarize loss on this batch
+                logger.info("epoch {} critic - c_loss1: {} - c_loss2: {}, generator - g_loss: {}".format(epoch,
+                                                                                                         c1_epoch_hist[-1],
+                                                                                                         c2_epoch_hist[-1],
+                                                                                                         g_epoch_hist[-1]))
+                c1_hist = list()
+                c2_hist = list()
+                g_hist = list()
+
                 # summarize performance
                 samples_fixed_latent_noise, generated_samples_fixed_latent_noise, labels_fixed_latent_noise = gan_sample_generator.generate_samples(self.generator)
                 samples_random_latent_noise, generated_samples_random_latent_noisee, labels_random_latent_noise = gan_sample_generator.generate_samples(self.generator, random_latent_noise=True)
@@ -271,27 +282,38 @@ class CWGAN:
                 # evaluate using machine learning efficacy
                 score_for_fixed_latent_noise = evaluate_machine_learning_efficacy(generated_samples_fixed_latent_noise, labels_fixed_latent_noise, X_test, y_test)
                 score_for_random_latent_noise = evaluate_machine_learning_efficacy(generated_samples_random_latent_noisee, labels_random_latent_noise, X_test, y_test)
-                logger.info("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}".format(epoch,
-                                                                                                                score_for_fixed_latent_noise,
-                                                                                                                score_for_random_latent_noise))
+
+                logger.info("epoch {} ML efficacy score fixed latent noise: {}, random latent noise: {}, best score(epoch={}): {}".format(
+                        epoch,
+                        score_for_fixed_latent_noise,
+                        score_for_random_latent_noise,
+                        best_epoch,
+                        max_score_for_fixed_latent_noise))
+
+                score_for_fixed_latent_noise_hist.append(score_for_fixed_latent_noise)
+                score_for_random_latent_noise_hist.append(score_for_random_latent_noise)
 
                 if score_for_fixed_latent_noise > max_score_for_fixed_latent_noise:
                     max_score_for_fixed_latent_noise = score_for_fixed_latent_noise
                     samples = samples_fixed_latent_noise
                     generated_samples = generated_samples_fixed_latent_noise
                     generated_labels = labels_fixed_latent_noise
+                    best_epoch = epoch
 
                     # save models
                     self.generator.save(f"{experiment_dir}/generator.h5")
                     self.critic.save(f"{experiment_dir}/critic.h5")
                     self.gan.save(f"{experiment_dir}/gan.h5")
 
-                    # evaluate using tsne
-                    evaluate_using_tsne(samples_fixed_latent_noise, generated_labels, df_real_not_normalized.columns.tolist(), categorical_columns.tolist(), epoch, experiment_dir)
-
                 if score_for_random_latent_noise > max_score_for_random_latent_noise:
                     max_score_for_random_latent_noise = score_for_random_latent_noise
 
                 epoch += 1
 
-        return c1_hist, c2_hist, g_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples, generated_samples, generated_labels
+        # evaluate using tsne
+        evaluate_using_tsne(samples, generated_labels,
+                            df_real_not_normalized.columns.tolist(), categorical_columns.tolist(), best_epoch,
+                            experiment_dir)
+
+        return c1_epoch_hist, c2_epoch_hist, g_epoch_hist, max_score_for_fixed_latent_noise, max_score_for_random_latent_noise, samples,\
+               generated_samples, generated_labels, score_for_fixed_latent_noise_hist, score_for_random_latent_noise_hist

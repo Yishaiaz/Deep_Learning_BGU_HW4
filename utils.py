@@ -12,7 +12,6 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.manifold import TSNE
 
 from global_vars import SEED
-from preprocessing_utils import gather_numeric_and_categorical_columns
 
 
 def log(path, file):
@@ -51,28 +50,32 @@ def plot_critic_generator_loss(x1: List, y1: List, x2: List, y2: List, label1: s
     # plotting the line 2 points
     plt.plot(x2, y2, label=label2)
     plt.xlabel(x_axis)
-    # Set the y axis label of the current axis.
+    # Set the y axis label of the current axis
     plt.ylabel(y_axis)
-    # Set a title of the current axes.
+    # Set a title of the current axes
     plt.title(title)
     # show a legend on the plot
     plt.legend()
-    # save a figure.
+    # save a figure
     plt.savefig(f'{experiment_dir}/loss_plot.png')
     plt.close()
 
 
-def plot_critic_accuracy(x: List, y: List, label1: str, x_axis: str, y_axis: str, title: str):
-    plt.plot(x, y, label=label1)
+def plot_score_metrics(x1: List, y1: List, x2: List, y2: List, label1: str, label2: str, x_axis: str, y_axis: str, title: str, experiment_dir):
+    # plotting the line 1 points
+    plt.plot(x1, y1, label=label1)
+    # plotting the line 2 points
+    plt.plot(x2, y2, label=label2)
     plt.xlabel(x_axis)
-    # Set the y axis label of the current axis.
+    # Set the y axis label of the current axis
     plt.ylabel(y_axis)
-    # Set a title of the current axes.
+    # Set a title of the current axes
     plt.title(title)
     # show a legend on the plot
     plt.legend()
-    # Display a figure.
-    plt.show()
+    # save a figure
+    plt.savefig(f'{experiment_dir}/{title}_plot.png')
+    plt.close()
 
 
 def plot_loss_history(d1_hist, d2_hist, g_hist, experiment_dir):
@@ -93,6 +96,14 @@ def plot_accuracy_history(d1_acc, d2_acc, experiment_dir):
     plt.savefig(f'{experiment_dir}/accuracy_plot.png')
     plt.close()
 
+
+def plot_accuracy_per_epoch_history(d_acc, experiment_dir):
+    # plot accuracy
+    plt.plot(d_acc)
+    plt.legend()
+    plt.title("Accuracy per epoch")
+    plt.savefig(f'{experiment_dir}/accuracy_plot.png')
+    plt.close()
 
 def tsne(df: pd.DataFrame, non_numeric_columns: list, hue: str, filename: str = '', save_figure: bool = False):
     df_copy = df.copy()
@@ -163,9 +174,9 @@ def draw_boxplot(real_samples: np.array, generated_samples: np.array, path_to_sa
     plt.savefig(path_to_save_fig, dpi=200)
 
 
-def real_to_generated_distance(real_df: pd.DataFrame, fake_df: pd.DataFrame, categorical_columns):
+def real_to_generated_distance(real_df: pd.DataFrame, fake_df: pd.DataFrame, categorical_columns, numeric_columns):
     column_correlation = table_evaluator.metrics.column_correlations(real_df, fake_df, categorical_columns)
-    euclidean_distance = table_evaluator.metrics.euclidean_distance(real_df.values, fake_df.values)
+    euclidean_distance = table_evaluator.metrics.euclidean_distance(real_df[numeric_columns].values, fake_df[numeric_columns].values)
     return column_correlation, euclidean_distance
 
 
