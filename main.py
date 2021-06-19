@@ -71,7 +71,7 @@ def train_cgan_and_generate_statistics(ds, df_real, input_size, columns_size, nu
     # Gather numeric and categorical columns into a list
     numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
 
-    cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL)
+    cgan = CGAN(input_size, columns_size, num_classes, is_label_conditional=IS_LABEL_CONDITIONAL, generator_lr=GENERATOR_LR, discriminator_lr=CRITIC_LR, discriminator_dropout=CRITIC_DROPOUT)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
                                               column_idx_to_scaler,
                                               column_idx_to_ohe,
@@ -143,7 +143,8 @@ def train_cwgan_and_generate_statistics(X, y, df_real, input_size, columns_size,
     numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized)
 
     gan = CWGAN(input_size, columns_size, num_classes,
-                is_label_conditional=IS_LABEL_CONDITIONAL, positive_negative_labels=positive_negative_labels)
+                is_label_conditional=IS_LABEL_CONDITIONAL, positive_negative_labels=positive_negative_labels,
+                generator_lr=GENERATOR_LR, critic_lr=CRITIC_LR, critic_dropout=CRITIC_DROPOUT)
     gan_sample_generator = GanSampleGenerator(LATENT_NOISE_SIZE,
                                               column_idx_to_scaler,
                                               column_idx_to_ohe,
@@ -255,7 +256,7 @@ def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size
     if GANBBMODEL_OBJECTIVE_FUNCTION == 'binary_crossentropy':
         gan_bb_model = GANBBModelBinaryCE(random_forest_model.model, input_size, columns_size)
     else:
-        gan_bb_model = GANBBModel(random_forest_model.model, input_size, columns_size)
+        gan_bb_model = GANBBModel(random_forest_model.model, input_size, columns_size, generator_lr=GENERATOR_LR, discriminator_lr=CRITIC_LR, discriminator_dropout=CRITIC_DROPOUT)
     gan_sample_generator = GanWithTwistSampleGenerator(LATENT_NOISE_SIZE,
                                                        column_idx_to_scaler,
                                                        column_idx_to_ohe,
@@ -455,24 +456,30 @@ if __name__ == '__main__':
         global GENERATOR_LR
         global CRITIC_LR
         global CRITIC_DROPOUT
+        global GAN_MODE
 
         # run grid search
+        gan_modes = [MODELS[0], MODELS[1]]
         batch_sizes = [16, 32]
         n_epochs = [200]
         generator_lr = [0.0005, 0.00005, 0.000005]
         critic_lr = [0.0005, 0.00005, 0.000005]
         critic_dropout = [0.2, 0.5]
-        for batch_size in batch_sizes:
-            for epoch in n_epochs:
-                for dropout in critic_dropout:
-                    for g_lr in generator_lr:
-                        for c_lr in critic_lr:
-                            BATCH_SIZE = batch_size
-                            N_EPOCHS = epoch
-                            GENERATOR_LR = g_lr
-                            CRITIC_LR = c_lr
-                            CRITIC_DROPOUT = dropout
 
-                            main()
+        for gan_mode in gan_modes:
+            for batch_size in batch_sizes:
+                for epoch in n_epochs:
+                    for dropout in critic_dropout:
+                        for g_lr in generator_lr:
+                            for c_lr in critic_lr:
+                                BATCH_SIZE = batch_size
+                                N_EPOCHS = epoch
+                                GENERATOR_LR = g_lr
+                                CRITIC_LR = c_lr
+                                CRITIC_DROPOUT = dropout
+                                GAN_MODE = gan_mode
+
+                                main()
+
     else:
         main()

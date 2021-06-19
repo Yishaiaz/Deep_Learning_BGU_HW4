@@ -157,7 +157,7 @@ class CWGAN:
             model = Sequential()
             # add generator
             model.add(generator)
-            # add the critir
+            # add the critic
             model.add(critic)
 
         opt = RMSprop(learning_rate=self._generator_lr)

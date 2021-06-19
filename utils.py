@@ -172,6 +172,7 @@ def draw_boxplot(real_samples: np.array, generated_samples: np.array, path_to_sa
     plt.legend([bp1["boxes"][0], bp2["boxes"][0]], ['Real', 'Generated'], loc='upper right')
     plt.tight_layout()
     plt.savefig(path_to_save_fig, dpi=200)
+    plt.close()
 
 
 def real_to_generated_distance(real_df: pd.DataFrame, fake_df: pd.DataFrame, categorical_columns, numeric_columns):
