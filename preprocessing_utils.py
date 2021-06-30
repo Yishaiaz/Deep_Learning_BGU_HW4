@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Tuple, List
+from typing import Tuple, List, Union,Any,Dict
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -28,12 +28,23 @@ def read_arff_file_as_dataframe(path_to_arff_file: str) -> pd.DataFrame:
 
 
 def transform_categorical_binary_column(df: pd.DataFrame, column_name: str, labels_to_num_dict: dict = None) -> pd.DataFrame:
-    # df.loc[:, column_name] = df[column_name].apply(lambda x: labels_to_num_dict[x])
+    """
+    transforms a column by the column name to a the labels_to_num_dict representation.
+    :param df:
+    :param column_name:
+    :param labels_to_num_dict:
+    :return:
+    """
     df = df.apply(lambda col: col.apply(lambda row: labels_to_num_dict[row]) if col.name == column_name else col)
     return df
 
 
 def gather_numeric_and_categorical_columns(df: pd.DataFrame) -> Tuple[np.array, np.array]:
+    """
+    collects and returns all numerical and categorical columns in a given dataframe
+    :param df:
+    :return:
+    """
     categorical_columns = df.select_dtypes(include=['object', 'category']).columns.values
     numeric_columns = df.select_dtypes(include=['number']).columns.values
 
@@ -41,10 +52,24 @@ def gather_numeric_and_categorical_columns(df: pd.DataFrame) -> Tuple[np.array, 
 
 
 def find_all_binary_columns(df: pd.DataFrame, dropna=True) -> list:
+    """
+    collects all columns with exactly two unique values.
+    :param df:
+    :param dropna:
+    :return:
+    """
     return df.loc[:, df.nunique(dropna=dropna) == 2].columns.to_list()
 
 
 def convert_x_y_to_tf_dataset(X: pd.DataFrame, y: pd.DataFrame, batch_size: int, include_y: bool = False) -> Dataset:
+    """
+    creates a tensorflow dataset from two dataframe representing the data's features (x) and the labels(y)
+    :param X:
+    :param y:
+    :param batch_size:
+    :param include_y:
+    :return:
+    """
     ds = tf.data.Dataset.from_tensor_slices(tf.convert_to_tensor(X.to_numpy()))
 
     if include_y:
@@ -59,6 +84,13 @@ def convert_x_y_to_tf_dataset(X: pd.DataFrame, y: pd.DataFrame, batch_size: int,
 def split_into_train_test(X: pd.DataFrame,
                           y: pd.DataFrame,
                           test_size: float = 0.3) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    """
+    utilizing sklearn's built in method, splits a dataset to training and testing datasets.
+    :param X:
+    :param y:
+    :param test_size:
+    :return:
+    """
     # split into train/test
     x_train, x_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=SEED,
                                                         shuffle=True, stratify=y)
@@ -67,6 +99,13 @@ def split_into_train_test(X: pd.DataFrame,
 
 
 def encode_categorical_vars(df: pd.DataFrame, col_to_encode: str, column_to_ohe: dict) -> Tuple[pd.DataFrame, OneHotEncoder]:
+    """
+    replaces all categorical features in the dataset to their onehot vector representation.
+    :param df:
+    :param col_to_encode:
+    :param column_to_ohe:
+    :return:
+    """
     def flatten_feature_arr(features_arrays: list):
         flatten_arr = []
         for inner_array in features_arrays:
@@ -83,7 +122,16 @@ def encode_categorical_vars(df: pd.DataFrame, col_to_encode: str, column_to_ohe:
 
 def read_and_prepare_dataset(path_to_arff_file: str,
                              labels_to_num_dict: dict,
-                             decode_categorical_columns: bool = True) -> Tuple[pd.DataFrame, pd.DataFrame, dict, dict]:
+                             decode_categorical_columns: bool = True) -> Tuple[
+    Union[pd.DataFrame, Any], pd.DataFrame, dict, Dict[Union[int, Any], Any], Any]:
+    """
+    read the dataset from the provided path and prepare it for ML.
+    encodes and transforms the dataset and returns the scalers and encoders by columns and the x and y datasets.
+    :param path_to_arff_file:
+    :param labels_to_num_dict:
+    :param decode_categorical_columns:
+    :return:
+    """
     tf.random.set_seed(SEED)
     np.random.seed(SEED)
 
@@ -111,16 +159,6 @@ def read_and_prepare_dataset(path_to_arff_file: str,
 
     for col in numeric_columns:
         X.loc[:, col] = column_to_scaler[col].fit_transform(X[[col]])
-
-    # # find all categorical binary columns
-    # categorical_binary_columns = find_all_binary_columns(X[categorical_columns])
-    #
-    # # transform categorical binary columns to 0/1
-    # le = LabelEncoder()
-    # X = X.apply(lambda col: le.fit_transform(col) if col.name in categorical_binary_columns else col)
-    #
-    # # remove binary categorical columns from the general categorical column list and get new numeric columns
-    # numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(X)
 
     # one-hot-encoding
     column_to_ohe = {column: OneHotEncoder(categories='auto') for column in categorical_columns}
