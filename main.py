@@ -224,6 +224,7 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     plt.tight_layout()
     fig_path = os.sep.join([experiment_dir, f'absolute_error_of_confidence_class{order_of_classes[proba_idx_to_measure]}.png'])
     plt.savefig(fig_path)
+    plt.close()
 
     bins_mse = np.zeros(shape=(len(bins_absolute_errors), ))
 
@@ -243,6 +244,7 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     # plt.legend()
     fig_path = os.sep.join([experiment_dir, f'mean_absolute_error_of_confidences_class_{order_of_classes[proba_idx_to_measure]}.png'])
     plt.savefig(fig_path)
+    plt.close()
 
 
 
@@ -254,7 +256,7 @@ def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size
     numeric_columns, categorical_columns = gather_numeric_and_categorical_columns(df_real_not_normalized.iloc[:, :-1])
 
     if GANBBMODEL_OBJECTIVE_FUNCTION == 'binary_crossentropy':
-        gan_bb_model = GANBBModelBinaryCE(random_forest_model.model, input_size, columns_size)
+        gan_bb_model = GANBBModelBinaryCE(random_forest_model.model, input_size, columns_size, generator_lr=GENERATOR_LR, discriminator_lr=CRITIC_LR, discriminator_dropout=CRITIC_DROPOUT)
     else:
         gan_bb_model = GANBBModel(random_forest_model.model, input_size, columns_size, generator_lr=GENERATOR_LR, discriminator_lr=CRITIC_LR, discriminator_dropout=CRITIC_DROPOUT)
     gan_sample_generator = GanWithTwistSampleGenerator(LATENT_NOISE_SIZE,
@@ -459,9 +461,9 @@ if __name__ == '__main__':
         global GAN_MODE
 
         # run grid search
-        gan_modes = [MODELS[0], MODELS[1]]
+        gan_modes = [MODELS[2]]
         batch_sizes = [16, 32]
-        n_epochs = [200]
+        n_epochs = [400]
         generator_lr = [0.0005, 0.00005, 0.000005]
         critic_lr = [0.0005, 0.00005, 0.000005]
         critic_dropout = [0.2, 0.5]
