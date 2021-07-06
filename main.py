@@ -12,7 +12,7 @@ from gan_with_twist_binary_cross_entropy import GANBBModelBinaryCE
 from random_forest_model import *
 from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, \
     model_confidence_score_distribution, generate_and_draw_boxplots, \
-    real_to_generated_distance, invert_labels_to_num_dict, GanWithTwistSampleGenerator, plot_critic_generator_loss, \
+    real_to_generated_distance, GanWithTwistSampleGenerator, plot_critic_generator_loss, \
     plot_score_metrics
 
 np_config.enable_numpy_behavior()
@@ -98,7 +98,7 @@ def train_cgan_and_generate_statistics(ds, df_real, input_size, columns_size, nu
                            columns=df_columns + [target_column_name])
     df_fake[numeric_columns] = df_fake[numeric_columns].apply(pd.to_numeric)
     table_evaluator = TableEvaluator(df_real_not_normalized, df_fake, cat_cols=categorical_columns.tolist())
-    #table_evaluator.visual_evaluation() TODO
+
     logger.info(table_evaluator.evaluate(target_col=target_column_name))
 
     # save fake dataframe
@@ -165,7 +165,7 @@ def train_cwgan_and_generate_statistics(X, y, df_real, input_size, columns_size,
     df_fake[numeric_columns] = df_fake[numeric_columns].apply(pd.to_numeric)
 
     table_evaluator = TableEvaluator(df_real_not_normalized, df_fake, cat_cols=categorical_columns.tolist())
-    #table_evaluator.visual_evaluation() TODO
+
     logger.info(table_evaluator.evaluate(target_col=target_column_name))
 
     # save fake dataframe
@@ -199,7 +199,6 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     bins = np.linspace(0, 1, number_of_bins + 1)
     bins_absolute_errors = [[] for i in range(number_of_bins)]
     absolute_errors_between_confidences = []
-    inverse_labels_to_num_dict = invert_labels_to_num_dict(labels_to_num_dict)
 
     for pos, class_val in order_of_classes.items():
         dist_by_class[class_val] = []
@@ -241,7 +240,6 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     ax.set_ylim((0, 1))
     fig.suptitle('Mean Absolute Error between confidence\nof GAN and BB prediction confidence')
     plt.tight_layout()
-    # plt.legend()
     fig_path = os.sep.join([experiment_dir, f'mean_absolute_error_of_confidences_class_{order_of_classes[proba_idx_to_measure]}.png'])
     plt.savefig(fig_path)
     plt.close()
@@ -461,7 +459,7 @@ if __name__ == '__main__':
         global GAN_MODE
 
         # run grid search
-        gan_modes = [MODELS[2]]
+        gan_modes = [MODELS[0], MODELS[1], MODELS[2]]
         batch_sizes = [16, 32]
         n_epochs = [400]
         generator_lr = [0.0005, 0.00005, 0.000005]
