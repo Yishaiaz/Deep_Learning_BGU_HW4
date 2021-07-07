@@ -15,6 +15,11 @@ from utils import evaluate_using_tsne
 
 
 class GANBBModel:
+    """
+    This class is implementation getting random latent noise and confidence score and based on the given black-box model
+    tries to generate samples that will get similar Y output from the BB model based on the given confidence score.
+    MSE objective function is used.
+    """
     def __init__(self,
                  bb_model: RandomForestClassifier,
                  input_size: int,

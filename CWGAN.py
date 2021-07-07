@@ -36,6 +36,9 @@ def wasserstein_loss(y_true, y_pred):
 
 
 class CWGAN:
+    """
+    This class is conditional gan with wasserstein loss with weights clipping implementation
+    """
     def __init__(self,
                  input_size: int,
                  columns_size: List[int],
@@ -166,6 +169,7 @@ class CWGAN:
         return model
 
     def generate_real_samples(self, X, y_labels, n_samples):
+        """choose n_samples from the given dataset and associate them with relevant label"""
         # choose random instances
         ix = randint(0, X.shape[0], n_samples)
         # select samples

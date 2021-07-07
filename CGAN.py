@@ -15,6 +15,9 @@ from utils import evaluate_machine_learning_efficacy, evaluate_using_tsne
 
 
 class CGAN:
+    """
+    This class is conditional gan implementation
+    """
     def __init__(self,
                  input_size: int,
                  columns_size: List[int],

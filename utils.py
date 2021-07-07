@@ -105,6 +105,7 @@ def plot_accuracy_per_epoch_history(d_acc, experiment_dir):
     plt.savefig(f'{experiment_dir}/accuracy_plot.png')
     plt.close()
 
+
 def tsne(df: pd.DataFrame, non_numeric_columns: list, hue: str, filename: str = '', save_figure: bool = False):
     df_copy = df.copy()
     # Drop the non-numerical columns from df
@@ -152,11 +153,13 @@ def evaluate_machine_learning_efficacy(generated_samples, labels, X_test, y_test
 
 
 def evaluate_using_tsne(samples, labels, df_columns, categorical_columns, index, dir):
+    """evaluate given samples via T-SNE dimensionality reduction"""
     df = pd.DataFrame(data=np.concatenate((np.array(samples), labels.reshape(-1, 1)), axis=1), columns=df_columns + ['class'])
     tsne(df, categorical_columns, hue='class', filename=f'{dir}/{index}_tsne', save_figure=True)
 
 
 def draw_boxplot(real_samples: np.array, generated_samples: np.array, path_to_save_fig: str):
+    """drawing boxplot comparing real data to generated samples"""
     def draw_plot(ax, data, offset,edge_color, fill_color):
         pos = np.arange(data.shape[1])+offset
         bp = ax.boxplot(data, positions= pos, widths=0.2, patch_artist=True)
@@ -176,26 +179,25 @@ def draw_boxplot(real_samples: np.array, generated_samples: np.array, path_to_sa
 
 
 def real_to_generated_distance(real_df: pd.DataFrame, fake_df: pd.DataFrame, categorical_columns, numeric_columns):
+    """calculates column correlations and eclidean distance between real data and generated data"""
     column_correlation = table_evaluator.metrics.column_correlations(real_df, fake_df, categorical_columns)
     euclidean_distance = table_evaluator.metrics.euclidean_distance(real_df[numeric_columns].values, fake_df[numeric_columns].values)
     return column_correlation, euclidean_distance
 
 
 def generate_and_draw_boxplots(experiment_dir, samples_reduced, df_real):
+    """drawing boxplot comparing real data to generated samples"""
     path_to_box_plot = os.sep.join([experiment_dir, 'boxplot.png'])
     draw_boxplot(real_samples=df_real.values,
                  generated_samples=np.asarray(samples_reduced),
                  path_to_save_fig=path_to_box_plot)
 
 
-def invert_labels_to_num_dict(labels_to_num_dict: dict):
-    inverse_dict = {}
-    for key, val in labels_to_num_dict.items():
-        inverse_dict[val] = key
-    return inverse_dict
-
-
 class GanSampleGenerator:
+    """
+    This class generates samples from either a fixed/random latent noise and based on fixed/random
+    labels and convert the generated samples back to their original form.
+    """
     def __init__(self,
                  latent_noise_size: int,
                  column_idx_to_scaler: dict,
@@ -290,6 +292,10 @@ class GanSampleGenerator:
 
 
 class GanWithTwistSampleGenerator:
+    """
+    This class generates samples from either a fixed/random latent noise and based on fixed/random
+    labels and fixed/random confidence scores and convert the generated samples back to their original form.
+    """
     def __init__(self,
                  latent_noise_size: int,
                  column_idx_to_scaler: dict,
