@@ -75,6 +75,11 @@ class CWGAN:
         self.gan = self._define_gan(self.generator, self.critic)
 
     def _build_critic(self):
+        """
+        builds the discriminator's layers. output layer is with sigmoid activation.
+        all layers are dense the size 256.
+        :return:
+        """
         # sample input
         sample_input = Input(shape=(self._input_size,))
 
@@ -108,6 +113,13 @@ class CWGAN:
         return critic
 
     def _build_generator(self):
+        """
+        builds the generators's layers. output layer is concatenated outputs for each feature, if the feature is
+        categorical a layer the size of the class (onehot vector size) is constructed with softmax activation,
+        otherwise a single unit layer is constructed with tanh as the activation function (for numeric features).
+        all layers are dense the size 256.
+        :return:
+        """
         # latent noise input
         noise_input = Input(shape=(self._latent_noise_size,))
 
@@ -141,6 +153,13 @@ class CWGAN:
         return generator
 
     def _define_gan(self, generator, critic):
+        """
+        defines the entire architecture as a single sequential model. connecting the output of the generator
+        to the discriminator. optimizer is RMSPROP and the loss is calculated with Wasserstein loss approximation.
+        :param generator:
+        :param critic:
+        :return:
+        """
         # make weights in the critic not trainable
         critic.trainable = False
 

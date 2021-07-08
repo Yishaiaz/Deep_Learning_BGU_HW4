@@ -54,8 +54,8 @@ class GeneratedResultsEvaluator:
         classifier_score_on_generated_ds = self.classifier_for_eval_generated_ds.train_and_score_model()
 
 if __name__ == '__main__':
-    gre_with_div = GeneratedResultsEvaluator(generated_data_df_path='Data/DIABETES_div_altered_data.arff', real_data_df_path='Data/diabetes.arff')
+    gre_with_div = GeneratedResultsEvaluator(generated_data_df_path='Data/DIABETES_div_altered_data.arff', real_data_df_path='../Data/diabetes.arff')
     gre_with_div.evaluate_datasets_similarity()
 
-    gre_with_rand = GeneratedResultsEvaluator(generated_data_df_path='Data/DIABETES_rand_altered_data.arff', real_data_df_path='Data/diabetes.arff')
+    gre_with_rand = GeneratedResultsEvaluator(generated_data_df_path='Data/DIABETES_rand_altered_data.arff', real_data_df_path='../Data/diabetes.arff')
     gre_with_div.evaluate_datasets_similarity()
