@@ -2,6 +2,7 @@ import os.path
 import pickle
 from sklearn.ensemble import RandomForestClassifier
 from preprocessing_utils import *
+from global_vars import *
 
 
 def create_and_train_random_forest(file_path_to_train: str) -> RandomForestClassifier:

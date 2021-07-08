@@ -46,6 +46,11 @@ class CGAN:
         self.gan = self._define_gan(self.generator, self.discriminator)
 
     def _build_discriminator(self):
+        """
+        builds the discriminator's layers. output layer is with sigmoid activation.
+        all layers are dense the size 256.
+        :return:
+        """
         # sample input
         sample_input = Input(shape=(self._input_size,))
 
@@ -77,6 +82,13 @@ class CGAN:
         return discriminator
 
     def _build_generator(self):
+        """
+        builds the generators's layers. output layer is concatenated outputs for each feature, if the feature is
+        categorical a layer the size of the class (onehot vector size) is constructed with softmax activation,
+        otherwise a single unit layer is constructed with tanh as the activation function (for numeric features).
+        all layers are dense the size 256.
+        :return:
+        """
         # latent noise input
         noise_input = Input(shape=(self._latent_noise_size,))
 
@@ -110,6 +122,13 @@ class CGAN:
         return generator
 
     def _define_gan(self, generator, discriminator):
+        """
+        defines the entire architecture as a single sequential model. connecting the output of the generator
+        to the discriminator. optimizer is RMSPROP and the loss is calculated with binary cross entropy.
+        :param generator:
+        :param critic:
+        :return:
+        """
         # make weights in the discriminator not trainable
         discriminator.trainable = False
 
