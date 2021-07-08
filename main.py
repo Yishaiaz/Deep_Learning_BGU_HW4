@@ -1,3 +1,7 @@
+import os
+import pandas as pd
+import numpy as np
+import tensorflow as tf
 import matplotlib.pyplot as plt
 from keras.models import load_model
 from pandas_profiling import ProfileReport
@@ -9,7 +13,9 @@ from CWGAN import CWGAN
 from SimpleClassifierForEvaluation import SimpleCLFForEvaluation
 from gan_with_twist import GANBBModel
 from gan_with_twist_binary_cross_entropy import GANBBModelBinaryCE
-from random_forest_model import *
+from global_vars import *
+from preprocessing_utils import gather_numeric_and_categorical_columns, read_arff_file_as_dataframe, \
+    read_and_prepare_dataset, convert_x_y_to_tf_dataset
 from utils import plot_loss_history, GanSampleGenerator, plot_accuracy_history, log, \
     model_confidence_score_distribution, generate_and_draw_boxplots, \
     real_to_generated_distance, GanWithTwistSampleGenerator, plot_critic_generator_loss, \
@@ -243,7 +249,6 @@ def part_2_section_4_c(X_generated: np.array, confidence_scores: np.array,
     fig_path = os.sep.join([experiment_dir, f'mean_absolute_error_of_confidences_class_{order_of_classes[proba_idx_to_measure]}.png'])
     plt.savefig(fig_path)
     plt.close()
-
 
 
 def train_gan_with_twist_and_generate_statistics(random_forest_model, input_size, columns_size, column_idx_to_scaler, column_idx_to_ohe, num_samples,
